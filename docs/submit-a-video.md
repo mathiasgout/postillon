@@ -21,7 +21,7 @@ bucket.submit(
     Entry(
         id="pasta-in-ten-minutes",
         publish_at=datetime(2026, 10, 19, 6, 0, tzinfo=UTC),
-        platforms=[YouTube(
+        posts=[YouTube(
             account="my-youtube",
             title="Pasta in ten minutes",
             description="A quick weeknight recipe.",
@@ -33,7 +33,8 @@ bucket.submit(
 
 `submit` validates the entry (see `manifest.md`), uploads the video, then writes the
 manifest, so that the service never sees a manifest without its video. It raises
-`ValueError` on an invalid entry, before writing anything.
+`ValueError` on an invalid entry or a video that is not an MP4 file, before writing
+anything.
 
 To change a publication, submit the entry again under the same `id`: the new manifest
 replaces the old one, and the service applies it to the platforms that have not

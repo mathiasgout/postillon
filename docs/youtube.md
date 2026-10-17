@@ -4,7 +4,7 @@ The YouTube adapter uploads the video as private with a scheduled publication ti
 (`publishAt`), so that YouTube publishes it at `publish_at` by itself. It acts as soon as
 it discovers the manifest, and updates the scheduled video when the manifest changes.
 
-## Manifest block
+## Post
 
 ```json
 "youtube": {
@@ -13,8 +13,7 @@ it discovers the manifest, and updates the scheduled video when the manifest cha
   "description": "A quick weeknight recipe.\n#cooking #pasta",
   "category_id": "26",
   "made_for_kids": false,
-  "contains_synthetic_media": false,
-  "video_id": null
+  "contains_synthetic_media": false
 }
 ```
 
@@ -35,6 +34,6 @@ A manifest change updates the title, description, category and `publishAt` of a
 scheduled video. YouTube does not replace the file of an uploaded video: a new video
 submitted for the same entry has no effect on YouTube.
 
-## State block
+## State
 
 `remote_id` holds the YouTube video identifier. The adapter adds no other field.

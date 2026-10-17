@@ -9,7 +9,7 @@ writer and the only reader of this object: a producer may look at it, but never 
   "version": 1,
   "manifest_sha256": "9f2c…",
   "error": null,
-  "platforms": {
+  "posts": {
     "youtube": {
       "status": "scheduled",
       "manifest_sha256": "9f2c…",
@@ -28,13 +28,13 @@ writer and the only reader of this object: a producer may look at it, but never 
 | `version` | Format version, `1`. |
 | `manifest_sha256` | SHA-256 of the manifest bytes the service last read. |
 | `error` | Why the whole manifest is rejected, `null` otherwise. |
-| `platforms.<name>.status` | Where the platform stands (see below). |
-| `platforms.<name>.manifest_sha256` | SHA-256 of the manifest this platform status reflects. |
-| `platforms.<name>.remote_id` | Identifier of the video on the platform, once known. |
-| `platforms.<name>.updated_at` | Last change of this platform entry, RFC 3339 in UTC. |
-| `platforms.<name>.error` | Last failure or rejection reason, `null` otherwise. |
+| `posts.<name>.status` | Where the post stands (see below). |
+| `posts.<name>.manifest_sha256` | SHA-256 of the manifest this post status reflects. |
+| `posts.<name>.remote_id` | Identifier of the video on the platform, once known. |
+| `posts.<name>.updated_at` | Last change of this post, RFC 3339 in UTC. |
+| `posts.<name>.error` | Last failure or rejection reason, `null` otherwise. |
 
-A platform document may add fields to its block (see `youtube.md`).
+A platform document may add fields to the state of its post (see `youtube.md`).
 
 ## Statuses
 
@@ -45,12 +45,12 @@ A platform document may add fields to its block (see `youtube.md`).
 | `scheduled` | The platform holds the video and publishes it at `publish_at` by itself. |
 | `published` | The video is public. Final. |
 | `failed` | The last attempt failed; the service retries on later passes. |
-| `rejected` | The account is not configured, or the platform refuses the block, such as an unknown category; nothing is retried until the manifest changes. |
+| `rejected` | The account is not configured, or the platform refuses the post, such as an unknown category; nothing is retried until the manifest changes. |
 
 ## Manifest changes
 
-When the top-level `manifest_sha256` differs from a platform's `manifest_sha256`, that
-platform has not applied the latest manifest yet:
+When the top-level `manifest_sha256` differs from a post's `manifest_sha256`, that post
+does not reflect the latest manifest yet:
 
 - **Before publication** (`pending`, `scheduled`, `failed`, `rejected`), the service applies
   the new manifest on the next pass, and the two digests match again.

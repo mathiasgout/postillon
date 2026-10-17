@@ -1,14 +1,15 @@
 # Manifest
 
-A manifest describes one entry: when it is published, and on which account and with which
-texts on each platform. `submit` writes it at `<project>/manifests/<entry>.json`, next to
-the video (see `bucket.md`); a producer written in another language writes the same JSON.
+A manifest describes one entry, a video, and its posts: the publications of that video on
+each platform, with their account and texts. `submit` writes it at
+`<project>/manifests/<entry>.json`, next to the video (see `bucket.md`); a producer
+written in another language writes the same JSON.
 
 ```json
 {
   "version": 1,
   "publish_at": "2026-10-19T06:00:00Z",
-  "platforms": {
+  "posts": {
     "youtube": {
       "account": "my-youtube",
       "title": "Pasta in ten minutes",
@@ -24,20 +25,20 @@ the video (see `bucket.md`); a producer written in another language writes the s
 | --- | --- | --- |
 | `version` | integer | Format version, `1`. |
 | `publish_at` | string | Publication time, RFC 3339 in UTC (`Z` suffix). |
-| `platforms` | object | One block per platform to publish on, keyed by platform name. |
+| `posts` | object | One post per platform to publish on, keyed by platform name. |
 
-Each platform block names the account to publish with, declared for that platform under
-the project in the service configuration, and carries the texts and options of the
-platform. Its fields are described by the platform's own document: `youtube.md`.
+Each post names the account to publish with, declared for that platform under the project
+in the service configuration, and carries the texts and options of the platform. Its
+fields are described by the platform's own document: `youtube.md`.
 
 ## Validation
 
 Validation runs on both sides, each with what it knows.
 
 - **On submission**, `submit` refuses an entry with a `publish_at` without time zone, no
-  platform, an unknown platform, or a platform block that breaks its platform's rules,
-  such as a title over the length limit. Nothing is written.
-- **In the service**, a manifest that is not valid JSON, or has an unknown `version` or
-  an unknown field, is rejected as a whole and publishes nothing. A platform block whose
-  account is absent from the project's configuration rejects that platform only. The
-  state records the reason (see `state.md`).
+  post, an unknown platform, two posts on the same platform, or a post that breaks its
+  platform's rules, such as a title over the length limit. Nothing is written.
+- **In the service**, a manifest that is not valid JSON, has an unknown `version` or an
+  unknown field, or breaks any of the rules above, is rejected as a whole and publishes
+  nothing. A post whose account is absent from the project's configuration rejects that
+  post only. The state records the reason (see `state.md`).
