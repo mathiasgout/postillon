@@ -47,6 +47,18 @@ A platform document may add fields to the state of its post (see `youtube.md`).
 | `failed` | The last attempt failed; the service retries on later passes. |
 | `rejected` | The account is not configured, or the platform refuses the post, such as an unknown category; nothing is retried until the manifest changes. |
 
+## When the adapter is called
+
+On every pass, the service hands each post to its platform's adapter, except:
+
+- a `published` post, never again;
+- a `rejected` post, until the manifest changes;
+- a `scheduled` post, until the manifest changes or `publish_at` is reached, when the
+  adapter confirms the publication.
+
+A post whose account is not configured is `rejected` without calling the adapter. An
+adapter that raises leaves its post `failed`, with the exception as `error`.
+
 ## Manifest changes
 
 When the top-level `manifest_sha256` differs from a post's `manifest_sha256`, that post

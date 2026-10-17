@@ -23,9 +23,11 @@ lists the prefixes of the projects declared in its configuration and ignores the
 
 1. The producer submits the entry: the video first, then the manifest, so that a
    discovered manifest always finds its video (see `submit-a-video.md`).
-2. The service lists each project's `manifests/` at a fixed interval, reads each manifest
-   and its state, and hands every platform of the entry to that platform's adapter.
+2. The service lists each project's `manifests/` at a fixed interval. It reads a manifest
+   when it is new or its ETag changed, and hands every post that needs work to its
+   platform's adapter (see `state.md`).
 3. To change a publication, the producer submits the entry again. The service applies the
-   change on the platforms that have not published yet (see `state.md`).
-4. Once every platform of the entry is `published`, the service deletes the video. A
-   bucket lifecycle rule removes the manifest and the state later.
+   change on the posts that have not published yet (see `state.md`).
+4. Once every post of the entry is `scheduled` or `published`, its platform holds the
+   video and the service deletes the bucket copy. A bucket lifecycle rule removes the
+   manifest and the state later; the service forgets an entry whose manifest is gone.

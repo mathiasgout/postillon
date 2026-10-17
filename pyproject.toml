@@ -11,6 +11,9 @@ dependencies = [
     "python-dotenv>=1.2.4",
 ]
 
+[project.scripts]
+postillon = "postillon.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
