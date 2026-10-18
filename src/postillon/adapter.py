@@ -65,15 +65,6 @@ def load_adapter(platform: str, accounts: dict[str, dict[str, Any]]) -> Adapter:
     return _adapter_module(platform).Adapter(accounts)
 
 
-def login(platform: str, account: str, settings: dict[str, Any]) -> dict[str, str]:
-    """The secrets of one account, obtained by the `login` function of its platform's adapter
-    module, by variable name; raises ValueError when the platform needs no login or refuses it."""
-    module = _adapter_module(platform)
-    if not hasattr(module, "login"):
-        raise ValueError(f"{platform}: accounts need no login")
-    return module.login(account, settings)
-
-
 def _adapter_module(platform: str) -> ModuleType:
     try:
         return importlib.import_module(f"postillon.platforms.{platform}.adapter")

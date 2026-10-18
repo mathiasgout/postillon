@@ -51,11 +51,6 @@ The module `adapter.py` defines a class named `Adapter`:
 | `video.url(expires_seconds)` | A signed URL the platform can fetch the video from. |
 | `checkpoint(state)` | Records a state at once, such as `in_progress` before a long upload. |
 
-A platform whose accounts need an authorization defines a function
-**`login(account, settings)`** in the same module. It receives the account's name and
-settings, obtains its secrets, interactively if needed, and returns them by variable name;
-`postillon login` writes them to `.env`. It raises `ValueError` on a refusal.
-
 The adapter decides when it acts: it may return `task.state` unchanged until
 `publish_at`. It records the platform's identifier of the video in `remote_id`, and any
 further field in `extra`, documented in the platform's document. An expected failure

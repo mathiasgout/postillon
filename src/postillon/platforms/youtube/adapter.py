@@ -1,5 +1,5 @@
-"""The YouTube adapter: uploads each video as private with `publishAt`, confirms its
-publication, and connects accounts (see docs/youtube.md).
+"""The YouTube adapter: uploads each video as private with `publishAt` and confirms its
+publication (see docs/youtube.md).
 
 Only module that talks to YouTube, through the YouTube Data API v3 of the `youtube` extra.
 """
@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from typing import Any, Self
 
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
@@ -64,24 +63,14 @@ class Account:
             raise ValueError(f"youtube account {name}: handle must start with @")
         return cls(**settings)
 
-    def client_config(self) -> dict[str, Any]:
-        return {"installed": {
-            "client_id": environment.variable(self.client_id_env),
-            "client_secret": environment.variable(self.client_secret_env),
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": TOKEN_URI,
-            "redirect_uris": ["http://localhost"],
-        }}
-
     def credentials(self) -> Credentials:
         """Credentials that obtain their access token from the refresh token; raises ValueError if a secret is missing."""
-        client = self.client_config()["installed"]
         return Credentials(
             None,
             refresh_token=environment.variable(self.refresh_token_env),
             token_uri=TOKEN_URI,
-            client_id=client["client_id"],
-            client_secret=client["client_secret"],
+            client_id=environment.variable(self.client_id_env),
+            client_secret=environment.variable(self.client_secret_env),
             scopes=SCOPES,
         )
 
@@ -124,18 +113,6 @@ class Adapter:
             _check_handle(youtube, settings.handle)
             self._clients[account] = youtube
         return self._clients[account]
-
-
-def login(name: str, settings: dict[str, Any]) -> dict[str, str]:
-    """Authorizes the account's channel in a browser and returns its refresh token by variable name;
-    raises ValueError if the authorized channel does not carry the configured handle."""
-    account = Account.from_settings(name, settings)
-    # Consent asked again guarantees a refresh token, which Google only issues on an account's first consent.
-    creds = InstalledAppFlow.from_client_config(account.client_config(), SCOPES).run_local_server(
-        port=0, prompt="consent",
-    )
-    _check_handle(_build(creds), account.handle)
-    return {account.refresh_token_env: creds.refresh_token}
 
 
 def _status(post: YouTube, publish_at: datetime, now: datetime) -> dict[str, Any]:

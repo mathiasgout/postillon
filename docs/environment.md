@@ -11,6 +11,5 @@ platforms, described by each platform's document.
 | `POSTILLON_BUCKET` | Bucket name. |
 
 The variables are read from the process environment, and from a `.env` file found from
-the working directory upwards; a variable set in the process wins. `postillon login`
-writes the secrets it obtains to that file, or creates `.env` in the working directory,
-readable by its owner only.
+the working directory upwards; a variable set in the process wins. postillon never
+writes this file: the operator places every secret in it.

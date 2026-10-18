@@ -20,25 +20,15 @@ refresh_token_env = "MY_YOUTUBE_REFRESH_TOKEN"
 | Setting | Required | Meaning |
 | --- | --- | --- |
 | `handle` | yes | Handle of the channel, starting with `@`. The service refuses a token that authorizes another channel. |
-| `refresh_token_env` | yes | Variable holding the channel's refresh token, written by `postillon login`. |
+| `refresh_token_env` | yes | Variable holding the channel's refresh token. |
 | `client_id_env` | no | Variable holding the OAuth client identifier, `POSTILLON_YOUTUBE_CLIENT_ID` by default. |
 | `client_secret_env` | no | Variable holding the OAuth client secret, `POSTILLON_YOUTUBE_CLIENT_SECRET` by default. |
 
-The OAuth client is of the "Desktop app" type. Its consent screen must be in production:
-in testing, Google revokes refresh tokens after 7 days. The service refuses to start when
-one of these variables is missing.
-
-## Log in
-
-```sh
-postillon login my-project youtube my-youtube
-```
-
-The command opens the browser on Google's consent page, where the channel owner picks the
-channel of the account and grants the `youtube.upload` and `youtube.readonly` scopes. It checks the handle of the
-authorized channel, then writes the refresh token to `.env` under `refresh_token_env`.
-It needs a browser: on a host without one, log in on another machine and copy the
-variable.
+The operator obtains the refresh token outside postillon, from the same OAuth client, with
+the `youtube.upload` and `youtube.readonly` scopes granted by the channel owner, and places
+it in `.env` with the client's identifier and secret (see `environment.md`). The client's
+consent screen must be in production: in testing, Google revokes refresh tokens after 7
+days. The service refuses to start when one of these variables is missing.
 
 ## Post
 

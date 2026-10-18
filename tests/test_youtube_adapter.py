@@ -1,4 +1,3 @@
-import dataclasses
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -260,20 +259,3 @@ def test_transient_errors_are_raised(step, youtube, status, reason):
     with pytest.raises(HttpError):
         step()
 
-
-class FakeFlow:
-    def run_local_server(self, port, prompt):
-        assert prompt == "consent"
-        return dataclasses.make_dataclass("Creds", ["refresh_token"])("new-token")
-
-
-def test_login_returns_the_refresh_token(monkeypatch, youtube):
-    monkeypatch.setattr(youtube_adapter.InstalledAppFlow, "from_client_config", lambda config, scopes: FakeFlow())
-    assert youtube_adapter.login("my-youtube", ACCOUNTS["my-youtube"]) == {"MY_YOUTUBE_REFRESH_TOKEN": "new-token"}
-
-
-def test_login_refuses_another_channel(monkeypatch, youtube):
-    monkeypatch.setattr(youtube_adapter.InstalledAppFlow, "from_client_config", lambda config, scopes: FakeFlow())
-    youtube.handle = "otherchannel"
-    with pytest.raises(ValueError, match="otherchannel"):
-        youtube_adapter.login("my-youtube", ACCOUNTS["my-youtube"])
