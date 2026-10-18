@@ -24,9 +24,12 @@ refresh_token_env = "MY_YOUTUBE_REFRESH_TOKEN"
 | `client_id_env` | no | Variable holding the OAuth client identifier, `POSTILLON_YOUTUBE_CLIENT_ID` by default. |
 | `client_secret_env` | no | Variable holding the OAuth client secret, `POSTILLON_YOUTUBE_CLIENT_SECRET` by default. |
 
-The operator obtains the refresh token outside postillon, from the same OAuth client, with
-the `youtube.upload` and `youtube.readonly` scopes granted by the channel owner, and places
-it in `.env` with the client's identifier and secret (see `environment.md`). The client's
+The operator obtains the refresh token from the OAuth 2.0 Playground
+(`https://developers.google.com/oauthplayground`), with the client's own credentials and
+the `youtube.upload` and `youtube.readonly` scopes granted by the channel owner; the
+client is then of type Web application, with that address as an authorized redirect URI.
+The operator places the token in `.env` with the client's identifier and secret (see
+`environment.md`). The client's
 consent screen must be in production: in testing, Google revokes refresh tokens after 7
 days. The service refuses to start when one of these variables is missing.
 
