@@ -19,5 +19,7 @@ the platform credentials.
 - `docs/state.md`: the state the service keeps per entry, its statuses and how manifest
   changes show.
 - `docs/youtube.md`: the YouTube platform, its accounts, its post, its behavior and its state.
+- `docs/instagram.md`: the Instagram platform, its accounts and their token renewal, its
+  post, its behavior and its state.
 - `docs/add-a-platform.md`: the post and the adapter a new platform provides.
 - `docs/tests.md`: run the tests.

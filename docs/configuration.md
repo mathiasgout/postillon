@@ -12,6 +12,10 @@ poll_seconds = 60
 handle = "@mychannel"
 refresh_token_env = "MY_YOUTUBE_REFRESH_TOKEN"
 
+[projects.my-project.instagram.my-instagram]
+username = "mychannel"
+access_token_env = "MY_INSTAGRAM_TOKEN"
+
 [projects.other-project.youtube.other-youtube]
 handle = "@otherchannel"
 refresh_token_env = "OTHER_YOUTUBE_REFRESH_TOKEN"
@@ -23,7 +27,7 @@ refresh_token_env = "OTHER_YOUTUBE_REFRESH_TOKEN"
 | `projects.<project>.<platform>.<account>` | One account of a platform in a project, named as posts name it in their `account` field. |
 
 The settings of an account belong to its platform and are described by the platform's
-document (see `youtube.md`). Account names are scoped by project: two projects may each
+document (see `youtube.md`, `instagram.md`). Account names are scoped by project: two projects may each
 have an account named `main`.
 
 The service refuses to start on an unknown key, a name outside its alphabet (see

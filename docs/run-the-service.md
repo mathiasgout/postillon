@@ -3,7 +3,7 @@
 Install postillon with the extras of the platforms the configuration uses:
 
 ```sh
-uv tool install 'postillon[youtube]'
+uv tool install 'postillon[youtube,instagram]'
 ```
 
 Set the bucket variables and the platforms' secrets (see `environment.md`), write the
@@ -42,6 +42,7 @@ User=postillon
 WantedBy=multi-user.target
 ```
 
-`WorkingDirectory` holds `postillon.toml` and the `.env` with the secrets. Stopping the
+`WorkingDirectory` holds `postillon.toml`, the `.env` with the secrets, and the files the
+service writes, such as `instagram-tokens.json` (see `instagram.md`). Stopping the
 service during an upload is safe: the post stays `in_progress`, and its adapter resolves
 it on the next start (see `state.md`).

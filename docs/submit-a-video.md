@@ -51,16 +51,26 @@ tzinfo=ZoneInfo("Europe/Paris"))` is the same publication time.
 
 ## Set the platform options
 
-Each post carries the options of its platform, with their defaults (see `youtube.md`):
+Each post carries the options of its platform, with their defaults (see `youtube.md`,
+`instagram.md`). An entry holds one post per platform it publishes on:
 
 ```python
-YouTube(
-    account="my-youtube",
-    title="Pasta in ten minutes",
-    description="A quick weeknight recipe.\n#cooking #pasta",
-    category_id="26",
-    contains_synthetic_media=True,
-)
+from postillon.platforms.instagram import Instagram
+
+posts = [
+    YouTube(
+        account="my-youtube",
+        title="Pasta in ten minutes",
+        description="A quick weeknight recipe.\n#cooking #pasta",
+        category_id="26",
+        contains_synthetic_media=True,
+    ),
+    Instagram(
+        account="my-instagram",
+        caption="Pasta in ten minutes.\n#cooking #pasta",
+        thumb_offset=1500,
+    ),
+]
 ```
 
 ## Submit a series

@@ -18,6 +18,7 @@ postillon = "postillon.cli:main"
 youtube = [
     "google-api-python-client>=2.201.0",
 ]
+instagram = []
 
 [build-system]
 requires = ["hatchling"]

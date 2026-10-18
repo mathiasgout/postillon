@@ -29,7 +29,7 @@ written in another language writes the same JSON.
 
 Each post names the account to publish with, declared for that platform under the project
 in the service configuration, and carries the texts and options of the platform. Its
-fields are described by the platform's own document: `youtube.md`.
+fields are described by the platform's own document: `youtube.md`, `instagram.md`.
 
 ## Validation
 

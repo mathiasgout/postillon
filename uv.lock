@@ -496,7 +496,7 @@ requires-dist = [
     { name = "google-api-python-client", marker = "extra == 'youtube'", specifier = ">=2.201.0" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
 ]
-provides-extras = ["youtube"]
+provides-extras = ["youtube", "instagram"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]
