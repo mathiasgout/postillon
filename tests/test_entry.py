@@ -28,7 +28,7 @@ def manifest(**fields):
 
 
 def test_manifest_round_trip():
-    original = entry(posts=[youtube(description="A quick weeknight recipe.", video_id="aBcD3fGh1jK")])
+    original = entry(posts=[youtube(description="A quick weeknight recipe.", category_id="26")])
     assert Entry.from_manifest(original.id, original.to_manifest()) == original
 
 
@@ -84,7 +84,6 @@ def test_invalid_entries(fields, message):
     ({"description": "a > b"}, "description contains"),
     ({"category_id": "music"}, "category_id"),
     ({"made_for_kids": "no"}, "boolean"),
-    ({"video_id": ""}, "video_id"),
 ])
 def test_invalid_youtube_posts(fields, message):
     with pytest.raises(ValueError, match=message):

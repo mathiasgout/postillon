@@ -7,7 +7,8 @@ uv tool install 'postillon[youtube]'
 ```
 
 Set the bucket variables and the platforms' secrets (see `environment.md`), write the
-configuration (see `configuration.md`), then start the service from that directory:
+configuration (see `configuration.md`), log in each account whose platform requires it
+(see the platform's document), then start the service from that directory:
 
 ```sh
 postillon serve
@@ -17,6 +18,17 @@ postillon serve
 | --- | --- |
 | `--config <path>` | Configuration file, `postillon.toml` by default. |
 | `--once` | Run a single pass, then exit. |
+
+## Log in an account
+
+```sh
+postillon login <project> <platform> <account>
+```
+
+The command obtains the secrets of an account declared in the configuration, as its
+platform's document describes, and writes them to `.env`. It accepts `--config` too.
+
+## Logs and exit
 
 The service logs each status change of a post, rejected manifests and failures to
 standard error. It exits with status 2 when the configuration, a variable or a

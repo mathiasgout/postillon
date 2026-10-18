@@ -27,7 +27,7 @@ lists the prefixes of the projects declared in its configuration and ignores the
    when it is new or its ETag changed, and hands every post that needs work to its
    platform's adapter (see `state.md`).
 3. To change a publication, the producer submits the entry again. The service applies the
-   change on the posts that have not published yet (see `state.md`).
+   change on the posts it has not sent to their platform yet (see `state.md`).
 4. Once every post of the entry is `scheduled` or `published`, its platform holds the
    video and the service deletes the bucket copy. A bucket lifecycle rule removes the
    manifest and the state later; the service forgets an entry whose manifest is gone.

@@ -105,9 +105,9 @@ class ProjectRunner:
     ) -> None:
         entry = manifest.entry
         current = state.posts.get(post.name, PostState())
+        if current.status in HOLDS_VIDEO and changed:
+            log.warning("%s/%s %s: %s, change ignored", self.bucket.project, entry.id, post.name, current.status)
         if current.status == Status.PUBLISHED:
-            if changed:
-                log.warning("%s/%s %s: published, change ignored", self.bucket.project, entry.id, post.name)
             return
         if not _needs_step(current, manifest.sha256, entry.publish_at, now):
             return
@@ -126,7 +126,10 @@ class ProjectRunner:
                 new = self.adapters[post.name].step(task)
             except Exception as e:
                 log.exception("%s/%s %s: step failed", self.bucket.project, entry.id, post.name)
-                new = dataclasses.replace(current, status=Status.FAILED, error=f"{type(e).__name__}: {e}")
+                # From the last checkpoint, whose fields tell the adapter what may have reached the platform.
+                new = dataclasses.replace(
+                    state.posts.get(post.name, current), status=Status.FAILED, error=f"{type(e).__name__}: {e}",
+                )
         previous = state.posts.get(post.name, current)
         state.posts[post.name] = _stamp(previous, new, manifest.sha256, now)
         if new.status != previous.status:
@@ -169,19 +172,21 @@ class Service:
 
 def _needs_step(current: PostState, sha256: str, publish_at: datetime, now: datetime) -> bool:
     """Whether the adapter has something to do: a `rejected` post waits for a new manifest, and a
-    `scheduled` one for a new manifest or for its publication time, to confirm it."""
-    changed = current.manifest_sha256 != sha256
+    `scheduled` one for its publication time, to confirm it."""
     if current.status == Status.REJECTED:
-        return changed
+        return current.manifest_sha256 != sha256
     if current.status == Status.SCHEDULED:
-        return changed or now >= publish_at
+        return now >= publish_at
     return True
 
 
 def _stamp(previous: PostState, new: PostState, sha256: str, now: datetime) -> PostState:
-    """The adapter's state with the manifest it reflects, dated when it differs from the previous one."""
+    """The adapter's state with the manifest it reflects, dated when it differs from the previous one; a
+    post whose platform holds the video keeps reflecting the manifest it was sent with."""
     if new.status not in (Status.FAILED, Status.REJECTED):
         new = dataclasses.replace(new, error=None)
+    if previous.status in HOLDS_VIDEO:
+        sha256 = previous.manifest_sha256
     new = dataclasses.replace(new, manifest_sha256=sha256, updated_at=previous.updated_at)
     if new != previous:
         new = dataclasses.replace(new, updated_at=now)

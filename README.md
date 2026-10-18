@@ -18,6 +18,6 @@ the platform credentials.
 - `docs/manifest.md`: the manifest of an entry, its fields and its validation.
 - `docs/state.md`: the state the service keeps per entry, its statuses and how manifest
   changes show.
-- `docs/youtube.md`: the YouTube platform, its post and its state.
+- `docs/youtube.md`: the YouTube platform, its accounts, its post, its behavior and its state.
 - `docs/add-a-platform.md`: the post and the adapter a new platform provides.
 - `docs/tests.md`: run the tests.

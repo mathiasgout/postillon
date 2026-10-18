@@ -10,5 +10,7 @@ platforms, described by each platform's document.
 | `POSTILLON_S3_SECRET_ACCESS_KEY` | Secret of that access key. |
 | `POSTILLON_BUCKET` | Bucket name. |
 
-The variables are read from the process environment, and from a `.env` file in the
-working directory when one exists.
+The variables are read from the process environment, and from a `.env` file found from
+the working directory upwards; a variable set in the process wins. `postillon login`
+writes the secrets it obtains to that file, or creates `.env` in the working directory,
+readable by its owner only.

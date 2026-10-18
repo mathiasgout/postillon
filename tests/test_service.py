@@ -104,13 +104,28 @@ def test_scheduled_post_is_confirmed_at_its_publication_time(runner, adapter, su
     assert state(s3)["posts"]["youtube"]["status"] == "published"
 
 
-def test_changed_manifest_reaches_a_scheduled_post(runner, adapter, submit, s3, tmp_path):
+def test_changed_manifest_reaches_a_post_not_sent_yet(runner, adapter, submit, s3, tmp_path):
+    adapter.behaviour = lambda task: task.state
     submit()
     run(runner, BEFORE, tmp_path)
     submit(title="Pasta in nine minutes")
     run(runner, BEFORE, tmp_path)
     assert [t.post.title for t in adapter.tasks] == ["Pasta in ten minutes", "Pasta in nine minutes"]
     assert state(s3)["posts"]["youtube"]["manifest_sha256"] == state(s3)["manifest_sha256"]
+
+
+def test_changed_manifest_is_ignored_once_scheduled(runner, adapter, submit, s3, tmp_path):
+    submit()
+    run(runner, BEFORE, tmp_path)
+    sent_with = state(s3)["posts"]["youtube"]["manifest_sha256"]
+    submit(title="Pasta in nine minutes")
+    run(runner, BEFORE, tmp_path)
+    assert len(adapter.tasks) == 1
+    adapter.behaviour = lambda task: dataclasses.replace(task.state, status=Status.PUBLISHED)
+    run(runner, PUBLISH_AT, tmp_path)
+    post = state(s3)["posts"]["youtube"]
+    assert post["status"] == "published"
+    assert post["manifest_sha256"] == sent_with != state(s3)["manifest_sha256"]
 
 
 def test_changed_manifest_is_ignored_after_publication(runner, adapter, submit, s3, tmp_path):
@@ -155,6 +170,21 @@ def test_adapter_exception_fails_the_post_and_is_retried(runner, adapter, submit
     assert post["error"] == "RuntimeError: quota exceeded"
     run(runner, BEFORE, tmp_path)
     assert len(adapter.tasks) == 2
+
+
+def test_adapter_exception_keeps_the_checkpoint_fields(runner, adapter, submit, s3, tmp_path):
+    def interrupted(task):
+        task.checkpoint(dataclasses.replace(task.state, status=Status.IN_PROGRESS, extra={"uploading": True}))
+        raise ConnectionError("reset")
+
+    adapter.behaviour = interrupted
+    submit()
+    run(runner, BEFORE, tmp_path)
+    post = state(s3)["posts"]["youtube"]
+    assert post["status"] == "failed"
+    assert post["uploading"] is True
+    run(runner, BEFORE, tmp_path)
+    assert adapter.tasks[-1].state.extra == {"uploading": True}
 
 
 def test_checkpoint_writes_the_state_at_once(runner, adapter, submit, s3, tmp_path):

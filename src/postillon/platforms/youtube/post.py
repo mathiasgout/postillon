@@ -21,7 +21,6 @@ class YouTube(Post):
     category_id: str = "22"
     made_for_kids: bool = False
     contains_synthetic_media: bool = False
-    video_id: str | None = None
 
     def validate(self) -> None:
         super().validate()
@@ -31,8 +30,6 @@ class YouTube(Post):
         for field in ("made_for_kids", "contains_synthetic_media"):
             if not isinstance(getattr(self, field), bool):
                 raise ValueError(f"youtube: {field} must be a boolean")
-        if self.video_id is not None and not (isinstance(self.video_id, str) and self.video_id):
-            raise ValueError("youtube: video_id must be a non-empty string")
         if not self.title.strip():
             raise ValueError("youtube: title is empty")
         if len(self.title) > TITLE_CHARS:

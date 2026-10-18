@@ -11,6 +11,7 @@ import importlib
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Protocol
 
 from postillon.bucket import Bucket
@@ -61,8 +62,20 @@ class Adapter(Protocol):
 def load_adapter(platform: str, accounts: dict[str, dict[str, Any]]) -> Adapter:
     """The adapter of a platform, from the `Adapter` class of its `adapter` module; raises
     ValueError when the platform's extra is not installed."""
+    return _adapter_module(platform).Adapter(accounts)
+
+
+def login(platform: str, account: str, settings: dict[str, Any]) -> dict[str, str]:
+    """The secrets of one account, obtained by the `login` function of its platform's adapter
+    module, by variable name; raises ValueError when the platform needs no login or refuses it."""
+    module = _adapter_module(platform)
+    if not hasattr(module, "login"):
+        raise ValueError(f"{platform}: accounts need no login")
+    return module.login(account, settings)
+
+
+def _adapter_module(platform: str) -> ModuleType:
     try:
-        module = importlib.import_module(f"postillon.platforms.{platform}.adapter")
+        return importlib.import_module(f"postillon.platforms.{platform}.adapter")
     except ModuleNotFoundError as e:
         raise ValueError(f"{platform}: adapter unavailable ({e.name} missing), install postillon[{platform}]") from None
-    return module.Adapter(accounts)

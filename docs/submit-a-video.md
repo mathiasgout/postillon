@@ -86,8 +86,8 @@ for day, video in enumerate(sorted(Path("week-43").glob("*.mp4"))):
 ## Change a publication
 
 Submit the entry again under the same `id`, with its new values: the new manifest replaces
-the old one, and the service applies it to the platforms that have not published yet (see
-`state.md`). Moving a publication one hour later:
+the old one, and the service applies it to the posts it has not sent to their platform yet
+(see `state.md`). Moving a publication one hour later:
 
 ```python
 bucket.submit(
@@ -98,15 +98,6 @@ bucket.submit(
     ),
     video=Path("pasta.mp4"),
 )
-```
-
-## Hand over a video already on YouTube
-
-A video already uploaded to the channel and scheduled there is adopted rather than
-uploaded again: its post names it with `video_id` (see `youtube.md`).
-
-```python
-YouTube(account="my-youtube", title="Pasta in ten minutes", video_id="aBcD3fGh1jK")
 ```
 
 ## Handle a refusal

@@ -10,9 +10,11 @@ poll_seconds = 60
 
 [projects.my-project.youtube.my-youtube]
 handle = "@mychannel"
+refresh_token_env = "MY_YOUTUBE_REFRESH_TOKEN"
 
 [projects.other-project.youtube.other-youtube]
 handle = "@otherchannel"
+refresh_token_env = "OTHER_YOUTUBE_REFRESH_TOKEN"
 ```
 
 | Key | Meaning |

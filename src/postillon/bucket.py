@@ -6,15 +6,14 @@ Only module that knows the keys; the variables it reads are listed in docs/envir
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 from typing import Self
 
 import boto3
 from botocore.exceptions import ClientError
-from dotenv import find_dotenv, load_dotenv
 
+from postillon import environment
 from postillon.entry import ENTRY_ID, Entry
 
 PROJECT = re.compile(r"[a-z0-9-]+")
@@ -112,24 +111,18 @@ class Bucket:
 
 def connect_from_env():
     """The S3 client and the bucket name read from the environment; raises ValueError if a variable is missing."""
-    load_dotenv(find_dotenv(usecwd=True))
+    environment.load()
     client = boto3.client(
         "s3",
-        endpoint_url=_env("POSTILLON_S3_ENDPOINT"),
-        aws_access_key_id=_env("POSTILLON_S3_ACCESS_KEY_ID"),
-        aws_secret_access_key=_env("POSTILLON_S3_SECRET_ACCESS_KEY"),
+        endpoint_url=environment.variable("POSTILLON_S3_ENDPOINT"),
+        aws_access_key_id=environment.variable("POSTILLON_S3_ACCESS_KEY_ID"),
+        aws_secret_access_key=environment.variable("POSTILLON_S3_SECRET_ACCESS_KEY"),
         # R2 ignores the region but the S3 client requires one; "auto" is what R2 documents.
         region_name="auto",
     )
-    return client, _env("POSTILLON_BUCKET")
+    return client, environment.variable("POSTILLON_BUCKET")
 
 
 def _missing(error: ClientError) -> bool:
     return error.response.get("Error", {}).get("Code") in ("NoSuchKey", "404")
 
-
-def _env(name: str) -> str:
-    value = os.environ.get(name)
-    if not value:
-        raise ValueError(f"environment variable {name} is not set")
-    return value

@@ -53,8 +53,8 @@ On every pass, the service hands each post to its platform's adapter, except:
 
 - a `published` post, never again;
 - a `rejected` post, until the manifest changes;
-- a `scheduled` post, until the manifest changes or `publish_at` is reached, when the
-  adapter confirms the publication.
+- a `scheduled` post, until `publish_at` is reached, when the adapter confirms the
+  publication.
 
 A post whose account is not configured is `rejected` without calling the adapter. An
 adapter that raises leaves its post `failed`, with the exception as `error`.
@@ -64,7 +64,8 @@ adapter that raises leaves its post `failed`, with the exception as `error`.
 When the top-level `manifest_sha256` differs from a post's `manifest_sha256`, that post
 does not reflect the latest manifest yet:
 
-- **Before publication** (`pending`, `scheduled`, `failed`, `rejected`), the service applies
-  the new manifest on the next pass, and the two digests match again.
-- **After publication** (`published`), the change has no effect and the digests stay
-  apart.
+- **Before the platform holds the video** (`pending`, `in_progress`, `failed`,
+  `rejected`), the service applies the new manifest on the next pass, and the two digests
+  match again.
+- **Once the platform holds the video** (`scheduled`, `published`), postillon never
+  modifies it: the change has no effect and the digests stay apart.
