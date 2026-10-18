@@ -65,6 +65,10 @@ AAC audio, 3 seconds to 15 minutes, 300 MB at most, 9:16 recommended.
 - **At `publish_at`**, or at the first pass after it, the adapter creates a Reel container
   from a signed URL of the video in the bucket, valid one hour, and the post is
   `in_progress`.
+- **A missed `publish_at`**: when the next entry of the project with an Instagram post on
+  the same account is due as well, such as after the service was stopped, the post is
+  `rejected` without creating a container. Only the last due Reel of the account is
+  published.
 - **On the next passes**, the adapter reads the container's status and publishes it once
   Instagram has processed the video; the post is then `published`.
 - **Failures**: a container Instagram cannot process rejects the post. A container that

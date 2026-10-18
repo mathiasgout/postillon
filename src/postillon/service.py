@@ -7,12 +7,15 @@ again only for a new or changed manifest.
 
 from __future__ import annotations
 
+import bisect
 import dataclasses
 import hashlib
 import logging
 import tempfile
 import time
-from datetime import UTC, datetime
+from collections import defaultdict
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Self
 
@@ -27,6 +30,10 @@ log = logging.getLogger(__name__)
 
 # Statuses of a post whose platform holds the video: the bucket copy is no longer needed.
 HOLDS_VIDEO = {Status.SCHEDULED, Status.PUBLISHED}
+# Every new YouTube upload counts against a daily quota shared by the channels of a Google Cloud
+# project: a lasting failure retried each minute would exhaust it within hours.
+RETRY_FIRST = timedelta(minutes=1)
+RETRY_MAX = timedelta(hours=1)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -52,18 +59,30 @@ class ProjectRunner:
         for gone in set(self._manifests) - set(listed):
             del self._manifests[gone]
             self._states.pop(gone, None)
+        manifests = {}
         for entry_id, etag in sorted(listed.items()):
             try:
-                self._run_entry(entry_id, etag, now, workdir / hashlib.sha256(entry_id.encode()).hexdigest()[:16])
+                manifest = self._manifests.get(entry_id)
+                if manifest is None or manifest.etag != etag:
+                    manifest = self._read_manifest(entry_id, etag)
+            except Exception:
+                log.exception("%s/%s: reading the manifest failed", self.bucket.project, entry_id)
+                continue
+            if manifest is not None:
+                manifests[entry_id] = manifest
+        slots = _slots(manifests.values())
+        for entry_id, manifest in manifests.items():
+            try:
+                self._run_entry(
+                    entry_id, manifest, now, slots, workdir / hashlib.sha256(entry_id.encode()).hexdigest()[:16],
+                )
             except Exception:
                 log.exception("%s/%s: pass failed", self.bucket.project, entry_id)
 
-    def _run_entry(self, entry_id: str, etag: str, now: datetime, workdir: Path) -> None:
-        manifest = self._manifests.get(entry_id)
-        if manifest is None or manifest.etag != etag:
-            manifest = self._read_manifest(entry_id, etag)
-            if manifest is None:
-                return
+    def _run_entry(
+        self, entry_id: str, manifest: Manifest, now: datetime, slots: dict[tuple[str, str], list[datetime]],
+        workdir: Path,
+    ) -> None:
         state = self._states.get(entry_id)
         if state is None:
             raw = self.bucket.read_state(entry_id)
@@ -78,7 +97,8 @@ class ProjectRunner:
         if manifest.entry is not None:
             video = Video(self.bucket, entry_id, workdir)
             for post in manifest.entry.posts:
-                self._run_post(manifest, post, state, now, video, changed)
+                next_publish_at = _next_slot(slots[post.name, post.account], manifest.entry.publish_at)
+                self._run_post(manifest, post, state, now, video, changed, next_publish_at)
         if state.to_json() == before:
             return
         self.bucket.write_state(entry_id, state.to_json())
@@ -102,6 +122,7 @@ class ProjectRunner:
 
     def _run_post(
         self, manifest: Manifest, post: Post, state: EntryState, now: datetime, video: Video, changed: bool,
+        next_publish_at: datetime | None,
     ) -> None:
         entry = manifest.entry
         current = state.posts.get(post.name, PostState())
@@ -121,7 +142,10 @@ class ProjectRunner:
                 current, status=Status.REJECTED, error=f"account {post.account!r} is not configured for {post.name}",
             )
         else:
-            task = Task(entry=entry, post=post, state=current, now=now, video=video, checkpoint=checkpoint)
+            task = Task(
+                entry=entry, post=post, state=current, now=now, video=video, checkpoint=checkpoint,
+                next_publish_at=next_publish_at,
+            )
             try:
                 new = self.adapters[post.name].step(task)
             except Exception as e:
@@ -130,6 +154,7 @@ class ProjectRunner:
                 new = dataclasses.replace(
                     state.posts.get(post.name, current), status=Status.FAILED, error=f"{type(e).__name__}: {e}",
                 )
+        new = dataclasses.replace(new, failures=current.failures + 1 if new.status == Status.FAILED else 0)
         previous = state.posts.get(post.name, current)
         state.posts[post.name] = _stamp(previous, new, manifest.sha256, now)
         if new.status != previous.status:
@@ -171,13 +196,36 @@ class Service:
 
 
 def _needs_step(current: PostState, sha256: str, publish_at: datetime, now: datetime) -> bool:
-    """Whether the adapter has something to do: a `rejected` post waits for a new manifest, and a
-    `scheduled` one for its publication time, to confirm it."""
+    """Whether the adapter has something to do: a `rejected` post waits for a new manifest, a
+    `failed` one for its retry delay or a new manifest, and a `scheduled` one for its
+    publication time, to confirm it."""
     if current.status == Status.REJECTED:
         return current.manifest_sha256 != sha256
+    if current.status == Status.FAILED and current.manifest_sha256 == sha256 and current.updated_at:
+        return now >= current.updated_at + _retry_delay(current.failures)
     if current.status == Status.SCHEDULED:
         return now >= publish_at
     return True
+
+
+def _retry_delay(failures: int) -> timedelta:
+    """1, 2, 4... minutes after the last of `failures` consecutive failures, one hour at most."""
+    return min(RETRY_FIRST * 2 ** (min(max(failures, 1), 7) - 1), RETRY_MAX)
+
+
+def _slots(manifests: Iterable[Manifest]) -> dict[tuple[str, str], list[datetime]]:
+    """The sorted `publish_at` of the valid entries, per platform and account."""
+    slots = defaultdict(list)
+    for manifest in manifests:
+        if manifest.entry is not None:
+            for post in manifest.entry.posts:
+                slots[post.name, post.account].append(manifest.entry.publish_at)
+    return {key: sorted(times) for key, times in slots.items()}
+
+
+def _next_slot(times: list[datetime], publish_at: datetime) -> datetime | None:
+    i = bisect.bisect_right(times, publish_at)
+    return times[i] if i < len(times) else None
 
 
 def _stamp(previous: PostState, new: PostState, sha256: str, now: datetime) -> PostState:

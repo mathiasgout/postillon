@@ -12,6 +12,7 @@ def test_state_round_trip_keeps_platform_fields():
             manifest_sha256="abc",
             remote_id="aBcD3fGh1jK",
             updated_at=datetime(2026, 10, 17, 19, 2, 11, tzinfo=UTC),
+            failures=2,
             extra={"container_id": "123"},
         )},
     )
@@ -32,5 +33,6 @@ def test_state_json_follows_the_documented_shape():
             "remote_id": None,
             "updated_at": "2026-10-17T00:00:00Z",
             "error": "quota",
+            "failures": 0,
         }},
     }

@@ -15,7 +15,8 @@ writer and the only reader of this object: a producer may look at it, but never 
       "manifest_sha256": "9f2c…",
       "remote_id": "aBcD3fGh1jK",
       "updated_at": "2026-10-17T19:02:11Z",
-      "error": null
+      "error": null,
+      "failures": 0
     }
   }
 }
@@ -33,6 +34,7 @@ writer and the only reader of this object: a producer may look at it, but never 
 | `posts.<name>.remote_id` | Identifier of the video on the platform, once known. |
 | `posts.<name>.updated_at` | Last change of this post, RFC 3339 in UTC. |
 | `posts.<name>.error` | Last failure or rejection reason, `null` otherwise. |
+| `posts.<name>.failures` | Consecutive `failed` outcomes of this post, `0` otherwise. |
 
 A platform document may add fields to the state of its post (see `youtube.md`).
 
@@ -44,7 +46,7 @@ A platform document may add fields to the state of its post (see `youtube.md`).
 | `in_progress` | An operation started and its outcome is unknown; the adapter resolves it on the next pass before sending anything again. |
 | `scheduled` | The platform holds the video and publishes it at `publish_at` by itself. |
 | `published` | The video is public. Final. |
-| `failed` | The last attempt failed; the service retries on later passes. |
+| `failed` | The last attempt failed; the service retries on a later pass. |
 | `rejected` | The account is not configured, or the platform refuses the post, such as an unknown category; nothing is retried until the manifest changes. |
 
 ## When the adapter is called
@@ -53,6 +55,9 @@ On every pass, the service hands each post to its platform's adapter, except:
 
 - a `published` post, never again;
 - a `rejected` post, until the manifest changes;
+- a `failed` post, until its retry delay has passed since `updated_at`, or the manifest
+  changes: 1 minute after the first failure, then twice as long after each new one,
+  1 hour at most;
 - a `scheduled` post, until `publish_at` is reached, when the adapter confirms the
   publication.
 

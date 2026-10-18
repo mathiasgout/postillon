@@ -134,6 +134,12 @@ class Adapter:
         if container is None:
             if task.now < task.entry.publish_at:
                 return state
+            # After an interruption, only the last missed Reel of the account goes out, rather than all at once.
+            if task.next_publish_at is not None and task.now >= task.next_publish_at:
+                return dataclasses.replace(
+                    state, status=Status.REJECTED, error=f"missed: the account's next Reel was due at "
+                    f"{task.next_publish_at:%Y-%m-%dT%H:%M:%SZ}", extra={},
+                )
             container = _create_container(user_id, post, task.video.url(VIDEO_URL_SECONDS), token)
             return dataclasses.replace(state, status=Status.IN_PROGRESS, error=None, extra={CONTAINER: container})
         status = _request("GET", container, {"fields": "status_code,status"}, token)

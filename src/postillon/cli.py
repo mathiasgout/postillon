@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import signal
 from pathlib import Path
 
 from postillon.config import load_config
@@ -19,16 +20,18 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    # systemd stops the service with SIGTERM: handled like Ctrl-C, so that the pass's temporary files go.
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
     try:
         config = load_config(args.config)
         service = Service.from_config(config)
     except ValueError as e:
         parser.exit(2, f"postillon: {e}\n")
-    if args.once:
-        service.run_pass()
-        return
     try:
-        service.run_forever(config.poll_seconds)
+        if args.once:
+            service.run_pass()
+        else:
+            service.run_forever(config.poll_seconds)
     except KeyboardInterrupt:
         pass
 

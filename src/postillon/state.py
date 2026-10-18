@@ -30,6 +30,8 @@ class PostState:
     remote_id: str | None = None
     updated_at: datetime | None = None
     error: str | None = None
+    # Consecutive `failed` outcomes, which space out the retries.
+    failures: int = 0
     # Fields a platform adds to the state of its post, described by the platform's document.
     extra: dict[str, Any] = dataclasses.field(default_factory=dict)
 
@@ -40,6 +42,7 @@ class PostState:
             "remote_id": self.remote_id,
             "updated_at": _rfc3339(self.updated_at),
             "error": self.error,
+            "failures": self.failures,
             **self.extra,
         }
 
@@ -53,6 +56,7 @@ class PostState:
             remote_id=data.get("remote_id"),
             updated_at=datetime.fromisoformat(updated_at) if updated_at else None,
             error=data.get("error"),
+            failures=data.get("failures", 0),
             extra={k: v for k, v in data.items() if k not in known},
         )
 

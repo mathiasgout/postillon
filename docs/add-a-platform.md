@@ -50,6 +50,7 @@ The module `adapter.py` defines a class named `Adapter`:
 | `video.file()` | The video as a local MP4 file, downloaded once per pass. |
 | `video.url(expires_seconds)` | A signed URL the platform can fetch the video from. |
 | `checkpoint(state)` | Records a state at once, such as `in_progress` before a long upload. |
+| `next_publish_at` | The `publish_at` of the project's next entry with a post on the same platform and account, `None` if there is none. |
 
 The adapter decides when it acts: it may return `task.state` unchanged until
 `publish_at`. It records the platform's identifier of the video in `remote_id`, and any

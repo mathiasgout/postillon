@@ -49,6 +49,8 @@ class Task:
     video: Video
     # Records an intermediate state at once, such as `in_progress` before a long upload.
     checkpoint: Callable[[PostState], None]
+    # The `publish_at` of the project's next entry with a post on the same platform and account.
+    next_publish_at: datetime | None = None
 
 
 class Adapter(Protocol):

@@ -43,6 +43,6 @@ WantedBy=multi-user.target
 ```
 
 `WorkingDirectory` holds `postillon.toml`, the `.env` with the secrets, and the files the
-service writes, such as `instagram-tokens.json` (see `instagram.md`). Stopping the
-service during an upload is safe: the post stays `in_progress`, and its adapter resolves
+service writes, such as `instagram-tokens.json` (see `instagram.md`). The service stops
+on SIGTERM as on Ctrl-C, and stopping it during an upload is safe: the post stays `in_progress`, and its adapter resolves
 it on the next start (see `state.md`).

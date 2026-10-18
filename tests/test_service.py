@@ -168,8 +168,50 @@ def test_adapter_exception_fails_the_post_and_is_retried(runner, adapter, submit
     post = state(s3)["posts"]["youtube"]
     assert post["status"] == "failed"
     assert post["error"] == "RuntimeError: quota exceeded"
+    assert post["failures"] == 1
     run(runner, BEFORE, tmp_path)
+    assert len(adapter.tasks) == 1
+    run(runner, BEFORE + timedelta(minutes=1), tmp_path)
     assert len(adapter.tasks) == 2
+
+
+def test_retry_delay_doubles_up_to_an_hour(runner, adapter, submit, s3, tmp_path):
+    def boom(task):
+        raise RuntimeError("quota exceeded")
+
+    adapter.behaviour = boom
+    submit()
+    for minute in range(4 * 60):
+        run(runner, BEFORE + timedelta(minutes=minute), tmp_path)
+    times = [task.now for task in adapter.tasks]
+    gaps = [(later - earlier) / timedelta(minutes=1) for earlier, later in zip(times, times[1:])]
+    assert gaps[:8] == [1, 2, 4, 8, 16, 32, 60, 60]
+    assert state(s3)["posts"]["youtube"]["failures"] == len(adapter.tasks)
+
+
+def test_changed_manifest_retries_a_failed_post_at_once(runner, adapter, submit, tmp_path):
+    def boom(task):
+        raise RuntimeError("quota exceeded")
+
+    adapter.behaviour = boom
+    submit()
+    run(runner, BEFORE, tmp_path)
+    submit(title="Pasta in eight minutes")
+    run(runner, BEFORE, tmp_path)
+    assert [task.post.title for task in adapter.tasks] == ["Pasta in ten minutes", "Pasta in eight minutes"]
+
+
+def test_success_resets_the_failures(runner, adapter, submit, s3, tmp_path):
+    def boom(task):
+        raise RuntimeError("quota exceeded")
+
+    adapter.behaviour = boom
+    submit()
+    run(runner, BEFORE, tmp_path)
+    adapter.behaviour = FakeAdapter().behaviour
+    run(runner, BEFORE + timedelta(minutes=1), tmp_path)
+    post = state(s3)["posts"]["youtube"]
+    assert (post["status"], post["failures"], post["error"]) == ("scheduled", 0, None)
 
 
 def test_adapter_exception_keeps_the_checkpoint_fields(runner, adapter, submit, s3, tmp_path):
@@ -183,7 +225,7 @@ def test_adapter_exception_keeps_the_checkpoint_fields(runner, adapter, submit, 
     post = state(s3)["posts"]["youtube"]
     assert post["status"] == "failed"
     assert post["uploading"] is True
-    run(runner, BEFORE, tmp_path)
+    run(runner, BEFORE + timedelta(minutes=1), tmp_path)
     assert adapter.tasks[-1].state.extra == {"uploading": True}
 
 
@@ -241,6 +283,19 @@ def test_task_gives_the_video_as_file_and_url(runner, adapter, submit, tmp_path)
     submit()
     run(runner, BEFORE, tmp_path)
     assert seen == {"file": b"video", "url": f"https://signed.example/{VIDEO_KEY}?expires=3600"}
+
+
+def test_task_gives_the_next_publication_time_of_the_account(bucket, adapter, tmp_path):
+    video = tmp_path / "pasta.mp4"
+    video.write_bytes(b"video")
+    for entry_id, hours, account in [("a", 0, "my-youtube"), ("b", 12, "my-youtube"), ("c", 6, "second")]:
+        posts = [YouTube(account=account, title=entry_id)]
+        bucket.submit(Entry(id=entry_id, publish_at=PUBLISH_AT + timedelta(hours=hours), posts=posts), video)
+    runner = ProjectRunner(bucket, {"youtube": adapter}, {"youtube": {"my-youtube", "second"}})
+    run(runner, BEFORE, tmp_path)
+    assert {task.entry.id: task.next_publish_at for task in adapter.tasks} == {
+        "a": PUBLISH_AT + timedelta(hours=12), "b": None, "c": None,
+    }
 
 
 def test_missing_video_fails_the_post(runner, adapter, submit, s3, tmp_path):

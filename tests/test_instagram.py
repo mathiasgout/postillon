@@ -121,10 +121,13 @@ def tokens(tmp_path):
 def step(api, tokens):
     adapter = Adapter(ACCOUNTS, tokens=tokens)
 
-    def step(state=PostState(), now=PUBLISH_AT, **post):
+    def step(state=PostState(), now=PUBLISH_AT, next_publish_at=None, **post):
         post = instagram(**post)
         entry = Entry(id="pasta-in-ten-minutes", publish_at=PUBLISH_AT, posts=[post])
-        task = Task(entry=entry, post=post, state=state, now=now, video=FakeVideo(), checkpoint=lambda state: None)
+        task = Task(
+            entry=entry, post=post, state=state, now=now, video=FakeVideo(), checkpoint=lambda state: None,
+            next_publish_at=next_publish_at,
+        )
         return adapter.step(task)
 
     return step
@@ -171,6 +174,24 @@ def test_publication_time_creates_the_container(step, api):
 def test_late_post_is_published_late(step, api):
     step(now=PUBLISH_AT + timedelta(days=2))
     assert len(api.created) == 1
+
+
+def test_late_post_is_published_before_the_next_one_is_due(step, api):
+    step(now=PUBLISH_AT + timedelta(hours=11), next_publish_at=PUBLISH_AT + timedelta(hours=12))
+    assert len(api.created) == 1
+
+
+def test_late_post_is_rejected_once_the_next_one_is_due(step, api):
+    new = step(now=PUBLISH_AT + timedelta(hours=12), next_publish_at=PUBLISH_AT + timedelta(hours=12))
+    assert api.created == []
+    assert new.status == Status.REJECTED
+    assert new.error == "missed: the account's next Reel was due at 2026-10-19T18:00:00Z"
+
+
+def test_container_created_in_time_is_published_after_the_next_one_is_due(step, api):
+    api.containers["c1"] = "FINISHED"
+    new = step(state=in_container(), now=PUBLISH_AT + timedelta(hours=12), next_publish_at=PUBLISH_AT + timedelta(hours=12))
+    assert new.status == Status.PUBLISHED
 
 
 def test_container_in_progress_waits(step, api):
