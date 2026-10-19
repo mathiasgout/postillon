@@ -4,6 +4,10 @@ The TikTok platform is manual: the service sends nothing to TikTok. The operator
 the video in TikTok Studio at `publish_at`, then marks the post scheduled through the API
 (see `api.md`); the worker only follows the publication time.
 
+TikTok leaves no other way: its Content Posting API publishes to private accounts only
+for an unaudited client, and its audit turns down tools that post to accounts their
+operator manages. Driving TikTok Studio by script would expose the account to suspension.
+
 It needs no other package than postillon and holds no credentials.
 
 ## Account
