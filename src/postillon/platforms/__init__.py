@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from postillon.platforms.base import PlatformPost
 from postillon.platforms.instagram import InstagramPost
+from postillon.platforms.tiktok import TikTokPost
 from postillon.platforms.youtube import YouTubePost
 
-POSTS: dict[str, type[PlatformPost]] = {post.name: post for post in (YouTubePost, InstagramPost)}
+POSTS: dict[str, type[PlatformPost]] = {post.name: post for post in (YouTubePost, InstagramPost, TikTokPost)}

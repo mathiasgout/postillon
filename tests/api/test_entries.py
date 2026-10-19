@@ -97,3 +97,48 @@ def test_health(client: TestClient):
 def test_app_refuses_a_database_not_migrated(settings: Settings):
     with pytest.raises(ValueError, match="run `postillon migrate`"):
         create_app(settings)
+
+
+def tiktok_manifest(publish_at: str = "2099-10-22T18:00:00Z") -> str:
+    return json.dumps(
+        {
+            "publish_at": publish_at,
+            "posts": {"youtube": {"account": "main", "title": "Day 23"}, "tiktok": {"account": "main", "caption": "x"}},
+        }
+    )
+
+
+def test_video_is_served_while_the_service_holds_it(client: TestClient, settings: Settings):
+    put(client, manifest())
+    response = client.get(f"{URL}.mp4")
+    assert (response.status_code, response.content) == (200, MP4)
+    assert response.headers["content-type"] == "video/mp4"
+    assert response.headers["content-disposition"] == 'inline; filename="my-project-season-1-day-23.mp4"'
+    (settings.videos_dir / "my-project" / "season-1" / "day-23.mp4").unlink()
+    assert client.get(f"{URL}.mp4").status_code == 404
+    assert client.get(URL).status_code == 200
+
+
+def test_manual_post_is_marked_scheduled(client: TestClient):
+    put(client, tiktok_manifest())
+    response = client.post(f"{URL}/posts/tiktok/scheduled")
+    assert response.status_code == 200
+    posts = {p["platform"]: p for p in response.json()["posts"]}
+    assert posts["tiktok"]["status"] == "scheduled"
+    assert [e["status"] for e in posts["tiktok"]["events"]] == ["pending", "scheduled"]
+    assert posts["youtube"]["status"] == "pending"
+
+
+@pytest.mark.parametrize(
+    ("publish_at", "path", "status", "detail"),
+    [
+        ("2099-10-22T18:00:00Z", "/posts/instagram/scheduled", 404, "has no instagram post"),
+        ("2099-10-22T18:00:00Z", "/posts/youtube/scheduled", 422, "youtube is published by the service"),
+        ("2000-10-22T18:00:00Z", "/posts/tiktok/scheduled", 409, "has passed"),
+    ],
+)
+def test_refused_scheduling(client: TestClient, publish_at: str, path: str, status: int, detail: str):
+    put(client, tiktok_manifest(publish_at))
+    response = client.post(f"{URL}{path}")
+    assert response.status_code == status
+    assert detail in response.json()["detail"]

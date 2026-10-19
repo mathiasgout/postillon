@@ -25,6 +25,10 @@ class ExamplePost(PlatformPost):
     caption: Annotated[str, StringConstraints(max_length=2200)] = ""
 ```
 
+A platform the service cannot publish to sets `manual` to `True`: the operator schedules
+its posts and marks them scheduled through the API (see `api.md`), and its client only
+follows `publish_at`, as `tiktok.md` describes.
+
 Register it in `POSTS` (`postillon/platforms/__init__.py`) and as a field of `Posts`
 (`postillon/manifest.py`).
 

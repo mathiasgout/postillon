@@ -1,0 +1,54 @@
+# TikTok
+
+The TikTok platform is manual: the service sends nothing to TikTok. The operator schedules
+the video in TikTok Studio at `publish_at`, then marks the post scheduled through the API
+(see `api.md`); the worker only follows the publication time.
+
+It needs no other package than postillon and holds no credentials.
+
+## Account
+
+An account designates one TikTok account the operator schedules videos on.
+
+```toml
+[projects.my-project.tiktok.my-tiktok]
+handle = "@mychannel"
+```
+
+| Setting | Required | Meaning |
+| --- | --- | --- |
+| `handle` | yes | Handle of the account, starting with `@`, shown to the operator. |
+
+## Post
+
+```json
+"tiktok": {
+  "account": "my-tiktok",
+  "caption": "Pasta in ten minutes #cooking"
+}
+```
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `account` | yes | Account name, declared under the project in the configuration. |
+| `caption` | no | Caption the operator pastes in TikTok Studio, 2200 UTF-16 code units at most (an emoji may count two). Empty by default. |
+
+## Behavior
+
+1. The post stays `pending` while the operator schedules it: the video, from
+   `GET /v1/projects/{project}/entries/{key}.mp4`, the caption and `publish_at`, in TikTok
+   Studio.
+2. The operator marks it scheduled
+   (`POST /v1/projects/{project}/entries/{key}/posts/tiktok/scheduled`), which the API
+   accepts before `publish_at` only. The post is `scheduled`.
+3. At `publish_at`, a `scheduled` post becomes `published`, on the operator's word: the
+   service reads nothing from TikTok. A post still `pending` is `rejected`, with the error
+   `not scheduled by the operator before publish_at`.
+
+A post marked scheduled is sent: a new submission leaves it as it is, its new caption or
+publication time listed in `ignored` (see `api.md`), and the operator changes it in TikTok
+Studio by hand.
+
+## State
+
+The platform keeps no `remote_id` and no `extra`.

@@ -21,6 +21,7 @@ def settings(tmp_path: Path) -> Settings:
             "my-project": {
                 "youtube": {"main": {"handle": "@mychannel", "refresh_token_env": "MY_YOUTUBE_TOKEN"}},
                 "instagram": {"main": {"username": "mychannel", "access_token_env": "MY_INSTAGRAM_TOKEN"}},
+                "tiktok": {"main": {"handle": "@mychannel"}},
             },
         },
     )

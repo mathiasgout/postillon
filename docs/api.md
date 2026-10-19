@@ -7,6 +7,8 @@ The API serves JSON under `/v1`; an interactive description of every route is se
 | --- | --- |
 | `PUT /v1/projects/{project}/entries/{key}` | Create or replace an entry. |
 | `GET /v1/projects/{project}/entries/{key}` | An entry, its posts and their history. |
+| `GET /v1/projects/{project}/entries/{key}.mp4` | The video of an entry. |
+| `POST /v1/projects/{project}/entries/{key}/posts/{platform}/scheduled` | Mark a post of a manual platform scheduled. |
 | `GET /v1/entries` | The entries, latest publication time first. |
 | `GET /health` | `{"status": "ok"}` while the API serves. |
 
@@ -68,6 +70,26 @@ A submission is checked whole before anything is written. On a replacement:
 | `extra` | Fields the platform keeps between two steps (see the platform's document). |
 | `updated_at` | Latest change of the post. |
 | `events` | Every status the post took, with its `error` and its time `at`, oldest first. |
+
+## Read the video of an entry
+
+`GET /v1/projects/{project}/entries/{key}.mp4` answers `200` with the MP4 file, displayed
+inline and named `{project}-{key}.mp4` with `/` turned into `-`, while the service holds
+the video; `404` once it is released (`video_released_at`) or when the entry does not
+exist.
+
+## Mark a post scheduled
+
+`POST /v1/projects/{project}/entries/{key}/posts/{platform}/scheduled`, without a body,
+records that the operator scheduled the post on a manual platform (see `tiktok.md`), which
+publishes it at `publish_at`. The post becomes `scheduled`.
+
+| Status | Meaning |
+| --- | --- |
+| `200` | Post scheduled. Body: the entry, as read above. |
+| `404` | The entry has no post on this platform. |
+| `409` | The post is no longer `pending`, `publish_at` has passed, or the worker changed it meanwhile. Nothing is written. |
+| `422` | The platform is not manual: the worker schedules its posts itself. |
 
 ## List entries
 

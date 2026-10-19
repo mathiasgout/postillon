@@ -14,6 +14,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints, fi
 from postillon.platforms import POSTS
 from postillon.platforms.base import PlatformPost
 from postillon.platforms.instagram import InstagramPost
+from postillon.platforms.tiktok import TikTokPost
 from postillon.platforms.youtube import YouTubePost
 
 # Chosen by the producer, unique within its project and never reused; `/` groups entries.
@@ -27,6 +28,7 @@ class Posts(BaseModel):
 
     youtube: YouTubePost | None = None
     instagram: InstagramPost | None = None
+    tiktok: TikTokPost | None = None
 
     def by_platform(self) -> dict[str, PlatformPost]:
         return {name: post for name in POSTS if (post := getattr(self, name)) is not None}

@@ -22,6 +22,9 @@ refresh_token_env = "MY_YOUTUBE_REFRESH_TOKEN"
 [projects.my-project.instagram.main]
 username = "mychannel"
 access_token_env = "MY_INSTAGRAM_TOKEN"
+
+[projects.my-project.tiktok.main]
+handle = "@mychannel"
 ```
 
 | Key | Default | Meaning |
@@ -34,7 +37,7 @@ access_token_env = "MY_INSTAGRAM_TOKEN"
 
 A project name follows `[a-z0-9-]+`, an account name `[a-z0-9_-]+`; account names are scoped
 by project and platform. The settings of an account belong to its platform: see
-`youtube.md` and `instagram.md`. At least one project is required.
+`youtube.md`, `instagram.md` and `tiktok.md`. At least one project is required.
 
 The processes refuse to start on an unknown key, a name outside its alphabet, a platform
 postillon does not know, or an account setting its platform refuses.

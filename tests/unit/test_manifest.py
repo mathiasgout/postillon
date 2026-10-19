@@ -35,7 +35,7 @@ def test_publish_at_is_converted_to_utc():
     [
         ('{"publish_at": "2026-10-22T18:00:00", "posts": {"youtube": {"account": "main", "title": "x"}}}', "timezone"),
         ('{"publish_at": "2026-10-22T18:00:00Z", "posts": {}}', "no post"),
-        ('{"publish_at": "2026-10-22T18:00:00Z", "posts": {"tiktok": {"account": "main"}}}', "tiktok"),
+        ('{"publish_at": "2026-10-22T18:00:00Z", "posts": {"vimeo": {"account": "main"}}}', "vimeo"),
         (
             '{"publish_at": "2026-10-22T18:00:00Z", "posts": {"youtube": {"account": "main", "title": "x"}}, "v": 1}',
             "v",

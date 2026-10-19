@@ -15,6 +15,10 @@ account and texts. It is the `entry` part of a submission (see `api.md`).
     "instagram": {
       "account": "main",
       "caption": "Pasta in ten minutes #cooking"
+    },
+    "tiktok": {
+      "account": "main",
+      "caption": "Pasta in ten minutes #cooking"
     }
   }
 }
@@ -23,11 +27,11 @@ account and texts. It is the `entry` part of a submission (see `api.md`).
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `publish_at` | string | Publication time, RFC 3339 with a time zone; kept in UTC. |
-| `posts` | object | One post per platform, keyed by platform name: `youtube`, `instagram`. |
+| `posts` | object | One post per platform, keyed by platform name: `youtube`, `instagram`, `tiktok`. |
 
 Each post names in `account` an account declared for its platform under the project (see
 `configuration.md`), and carries the fields of its platform, described by the platform's
-document: `youtube.md`, `instagram.md`.
+document: `youtube.md`, `instagram.md`, `tiktok.md`.
 
 ## Validation
 

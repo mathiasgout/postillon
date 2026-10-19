@@ -23,4 +23,8 @@ def load_platforms(project: ProjectSettings, data_dir: Path) -> dict[str, Platfo
         from postillon.platforms.instagram.client import InstagramPlatform  # noqa: PLC0415 (loaded with its peer)
 
         platforms["instagram"] = InstagramPlatform(project.instagram, data_dir / "instagram-tokens.json")
+    if project.tiktok:
+        from postillon.platforms.tiktok.client import TikTokPlatform  # noqa: PLC0415 (loaded with its peers)
+
+        platforms["tiktok"] = TikTokPlatform()
     return platforms

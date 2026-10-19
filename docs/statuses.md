@@ -7,7 +7,7 @@ Every change is recorded as an event of the post (see `api.md`).
 | --- | --- |
 | `pending` | Nothing sent to the platform yet. |
 | `in_progress` | An operation started and its outcome is unknown; the platform resolves it on the next pass before sending anything again. |
-| `scheduled` | The platform holds the video and publishes it at `publish_at` by itself. |
+| `scheduled` | The platform holds the video and publishes it at `publish_at` by itself. On a manual platform, the operator says so through the API (see `api.md`). |
 | `published` | The video is public. Final. |
 | `failed` | The latest attempt failed; the worker tries again later. |
 | `rejected` | The platform refuses the post, or its account is no longer configured; nothing is tried again until the entry is submitted again. |

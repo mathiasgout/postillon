@@ -1,4 +1,5 @@
-"""The routes of the entries: submit one, read one, list them (see docs/api.md)."""
+"""The routes of the entries: submit one, read one and its video, list them, mark a manual post
+scheduled (see docs/api.md)."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, Path, Query, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from postillon.api.deps import SessionDep, SettingsDep, VideosDep
@@ -14,12 +16,14 @@ from postillon.api.schemas import EntryOut, SubmissionOut
 from postillon.domain import Status
 from postillon.manifest import Manifest
 from postillon.services import entries
+from postillon.services.scheduling import NotManual, PostNotFound, SchedulingConflict, mark_scheduled
 from postillon.services.submission import SubmissionConflict, SubmissionRefused, UnknownProject, submit
 
 router = APIRouter(tags=["entries"])
 
 ProjectPath = Annotated[str, Path(pattern=r"^[a-z0-9-]+$")]
 KeyPath = Annotated[str, Path(pattern=r"^[a-z0-9_-]+(/[a-z0-9_-]+)*$", max_length=200)]
+PlatformPath = Annotated[str, Path(pattern=r"^[a-z0-9_-]+$")]
 
 
 @router.put(
@@ -72,6 +76,25 @@ def put_entry(
     return SubmissionOut(entry=entry_out, ignored=submitted.ignored)
 
 
+# Declared before `get_entry`, whose `{key:path}` would take the suffix; a key never holds a dot.
+@router.get(
+    "/projects/{project}/entries/{key:path}.mp4",
+    response_class=FileResponse,
+    responses={200: {"content": {"video/mp4": {}}}, 404: {}},
+)
+def get_video(project: ProjectPath, key: KeyPath, videos: VideosDep) -> FileResponse:
+    """The video of the entry, while the service holds it."""
+    path = videos.path(project, key)
+    if not path.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"the service holds no video of {project}/{key}")
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        filename=f"{project}-{key.replace('/', '-')}.mp4",
+        content_disposition_type="inline",
+    )
+
+
 @router.get("/projects/{project}/entries/{key:path}", responses={404: {}})
 def get_entry(project: ProjectPath, key: KeyPath, session: SessionDep) -> EntryOut:
     """The entry, the state of its posts and the history of their statuses."""
@@ -91,3 +114,18 @@ def list_entries(
 ) -> list[EntryOut]:
     """The entries, latest publication first, of one project or all, with a post of one status or any."""
     return [EntryOut.model_validate(e) for e in entries.find(session, project, post_status, limit, offset)]
+
+
+@router.post("/projects/{project}/entries/{key:path}/posts/{platform}/scheduled", responses={404: {}, 409: {}, 422: {}})
+def schedule_post(project: ProjectPath, key: KeyPath, platform: PlatformPath, session: SessionDep) -> EntryOut:
+    """Records that the operator scheduled the post on its platform, which publishes it at `publish_at`.
+    Only for a pending post of a manual platform, before its publication time."""
+    try:
+        mark_scheduled(session, project=project, key=key, platform=platform, now=datetime.now(UTC))
+    except PostNotFound as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
+    except NotManual as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
+    except SchedulingConflict as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    return EntryOut.model_validate(entries.get(session, project, key))

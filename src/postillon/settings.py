@@ -14,6 +14,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 
 from postillon.platforms.base import AccountName
 from postillon.platforms.instagram.settings import InstagramAccount
+from postillon.platforms.tiktok.settings import TikTokAccount
 from postillon.platforms.youtube.settings import YouTubeAccount
 
 ProjectName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
@@ -27,6 +28,7 @@ class ProjectSettings(BaseModel):
 
     youtube: dict[AccountName, YouTubeAccount] = {}
     instagram: dict[AccountName, InstagramAccount] = {}
+    tiktok: dict[AccountName, TikTokAccount] = {}
 
     def accounts(self, platform: str) -> set[str]:
         return set(getattr(self, platform, {}))

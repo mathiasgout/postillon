@@ -27,6 +27,8 @@ class PlatformPost(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     name: ClassVar[str]
+    # Scheduled by the operator, who tells the API once the platform holds the video.
+    manual: ClassVar[bool] = False
 
     account: AccountName
 
