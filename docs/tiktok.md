@@ -2,7 +2,7 @@
 
 The TikTok platform is manual: the service sends nothing to TikTok. The operator schedules
 the video in TikTok Studio at `publish_at`, then marks the post scheduled from the
-administration page (see `admin-page.md`); the worker only follows the publication time.
+administration pages (see `admin-page.md`); the worker only follows the publication time.
 
 TikTok leaves no other way: its Content Posting API publishes to private accounts only
 for an unaudited client, and its audit turns down tools that post to accounts their
@@ -40,7 +40,7 @@ handle = "@mychannel"
 ## Behavior
 
 1. The post stays `pending` while the operator schedules it in TikTok Studio, from the
-   video, the caption and `publish_at` the administration page shows (see `admin-page.md`).
+   video, the caption and `publish_at` the To schedule page shows (see `admin-page.md`).
 2. The operator marks it scheduled, from the page or the API
    (`POST /v1/projects/{project}/entries/{key}/posts/tiktok/scheduled`), which accepts it
    before `publish_at` only. The post is `scheduled`.

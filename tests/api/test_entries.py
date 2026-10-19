@@ -98,8 +98,8 @@ def test_admin_page_is_served_beside_the_routes(client: TestClient):
     page = client.get("/")
     assert page.status_code == 200
     assert page.headers["content-type"].startswith("text/html")
-    assert '<script src="app.js">' in page.text
-    for asset in ("/app.js", "/style.css"):
+    assert '<script type="module" src="schedule.js">' in page.text
+    for asset in ("/publications.html", "/entry.html", "/common.js", "/style.css", "/fonts/barlow-condensed-600.woff2"):
         assert client.get(asset).status_code == 200
     assert client.get("/docs").status_code == 200
     assert client.get("/v1/entries").json() == []

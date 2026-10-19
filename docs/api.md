@@ -11,7 +11,7 @@ The API serves JSON under `/v1`; an interactive description of every route is se
 | `POST /v1/projects/{project}/entries/{key}/posts/{platform}/scheduled` | Mark a post of a manual platform scheduled. |
 | `GET /v1/entries` | The entries, latest publication time first. |
 | `GET /health` | `{"status": "ok"}` while the API serves. |
-| `GET /` | The administration page (see `admin-page.md`). |
+| `GET /` | The administration pages (see `admin-page.md`). |
 
 ## Names
 

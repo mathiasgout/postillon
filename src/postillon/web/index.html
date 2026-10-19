@@ -3,42 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>postillon</title>
+  <title>To schedule - postillon</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>postillon</h1>
-    <form id="filters">
-      <label>Project
-        <select name="project"><option value="">All</option></select>
-      </label>
-      <label>Status
-        <select name="status">
-          <option value="">Any</option>
-          <option>pending</option>
-          <option>in_progress</option>
-          <option>scheduled</option>
-          <option>published</option>
-          <option>failed</option>
-          <option>rejected</option>
-        </select>
-      </label>
-      <button type="button" id="refresh">Refresh</button>
-    </form>
-  </header>
-  <main>
-    <p id="error" class="error" hidden></p>
-    <section id="todo" hidden>
-      <h2>To schedule</h2>
-      <div id="todo-list"></div>
-    </section>
-    <section>
-      <h2>Entries</h2>
-      <div id="entries"></div>
-      <button type="button" id="more" hidden>Load more</button>
-    </section>
+  <main class="wrap">
+    <h1>To schedule</h1>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <div id="list" class="todo-list"></div>
   </main>
-  <script src="app.js"></script>
+  <script type="module" src="schedule.js"></script>
 </body>
 </html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Publications - postillon</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>Publications</h1>
+    <form id="filters" class="filters">
+      <label>Project
+        <select name="project"><option value="">All projects</option></select>
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="">Any status</option>
+          <option value="pending">Pending</option>
+          <option value="in_progress">Sending</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="published">Published</option>
+          <option value="failed">Failed</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </label>
+    </form>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <div id="board" class="board"></div>
+    <div class="more"><button type="button" id="more" hidden>Show earlier publications</button></div>
+  </main>
+  <script type="module" src="publications.js"></script>
+</body>
+</html>

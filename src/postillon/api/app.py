@@ -1,5 +1,5 @@
 """The FastAPI application: its state, its routes under `/v1`, its health check (see docs/api.md) and
-the administration page at `/` (see docs/admin-page.md)."""
+the administration pages at `/` (see docs/admin-page.md)."""
 
 from __future__ import annotations
 
