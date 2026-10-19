@@ -55,7 +55,7 @@ def submit(
 ) -> Submitted:
     """Creates or replaces the entry; raises UnknownProject, SubmissionRefused or
     SubmissionConflict, having written nothing."""
-    posts = _check_accounts(settings, project, manifest)
+    posts = check_accounts(settings, project, manifest)
     entry = session.scalar(
         select(Entry).where(Entry.project == project, Entry.key == key).options(selectinload(Entry.posts)),
     )
@@ -91,7 +91,7 @@ def submit(
     return Submitted(entry=entry, created=created, ignored=ignored)
 
 
-def _check_accounts(settings: Settings, project: str, manifest: Manifest) -> dict[str, PlatformPost]:
+def check_accounts(settings: Settings, project: str, manifest: Manifest) -> dict[str, PlatformPost]:
     """The manifest's posts, each with an account configured in the project."""
     configured = settings.projects.get(project)
     if configured is None:

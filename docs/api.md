@@ -6,6 +6,7 @@ The API serves JSON under `/v1`; an interactive description of every route is se
 | Route | Purpose |
 | --- | --- |
 | `PUT /v1/projects/{project}/entries/{key}` | Create or replace an entry. |
+| `POST /v1/projects/{project}/entries/{key}/record` | Record an entry published outside the service. |
 | `GET /v1/projects/{project}/entries/{key}` | An entry, its posts and their history. |
 | `GET /v1/projects/{project}/entries/{key}.mp4` | The video of an entry. |
 | `POST /v1/projects/{project}/entries/{key}/posts/{platform}/scheduled` | Mark a post of a manual platform scheduled. |
@@ -48,6 +49,45 @@ A submission is checked whole before anything is written. On a replacement:
 | `409` | The worker changed a post of the entry meanwhile; nothing is written, submitting again settles it. |
 | `422` | Invalid manifest or name, account not configured for the platform in the project, video missing, not an MP4, or too large. `detail` holds the reason, or the faulty fields with their location in `entry`. |
 
+## Record an entry published outside the service
+
+`POST /v1/projects/{project}/entries/{key}/record`, as JSON, records an entry whose posts
+went public without the service, so that its history holds them. The service sends nothing
+and holds no video: every post is `published`, and the worker never steps it.
+
+```json
+{
+  "manifest": {
+    "publish_at": "2026-10-12T18:00:00Z",
+    "posts": {
+      "youtube": {"account": "main", "title": "Pasta in ten minutes"},
+      "tiktok": {"account": "main", "caption": "Pasta in ten minutes #cooking"}
+    }
+  },
+  "published": {
+    "youtube": {"at": "2026-10-12T18:00:00Z", "remote_id": "dQw4w9WgXcQ"},
+    "tiktok": {"at": "2026-10-12T19:30:00Z"}
+  }
+}
+```
+
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `manifest` | yes | The manifest, checked as on a submission (see `manifest.md`). |
+| `published` | yes | One publication per post of the manifest, keyed by platform. |
+| `published.<platform>.at` | yes | When the post went public, RFC 3339 with a time zone, in the past. |
+| `published.<platform>.remote_id` | no | Identifier of the video on the platform. |
+
+Each post has one event, `published` at its `at`; `video_released_at` is the time of the
+record.
+
+| Status | Meaning |
+| --- | --- |
+| `201` | Entry recorded. Body: the entry, as read below. |
+| `404` | Project not configured. |
+| `409` | The entry exists already; a record never changes an entry. |
+| `422` | Invalid manifest or name, account not configured, `published` not naming exactly the platforms of the posts, or a publication time in the future. |
+
 ## Read an entry
 
 `GET /v1/projects/{project}/entries/{key}` answers `200` with the entry, or `404`.
@@ -58,7 +98,7 @@ A submission is checked whole before anything is written. On a replacement:
 | `publish_at` | Publication time, in UTC. |
 | `manifest` | The latest manifest submitted, with the defaults filled in. |
 | `submitted_at`, `updated_at` | First and latest submission. |
-| `video_released_at` | When the service deleted its copies of the video, every platform holding it; `null` before. |
+| `video_released_at` | When the service deleted its copies of the video, every platform holding it, or recorded the entry; `null` before. |
 | `posts` | One post per platform, see below. |
 
 | Post field | Meaning |

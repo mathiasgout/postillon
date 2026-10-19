@@ -41,7 +41,7 @@ function render(entry) {
     h("div", { class: "entry" },
       h("div", { class: "entry-video" },
         entry.video_released_at
-          ? h("p", { class: "muted" }, "Every platform holds the video; the service released its copy on ", when(entry.video_released_at), ".")
+          ? h("p", { class: "muted" }, "The service holds no video of this entry since ", when(entry.video_released_at), ".")
           : h("video", { src: `${entryUrl(entry)}.mp4`, controls: true, preload: "metadata", playsinline: true }),
       ),
       h("div", {},

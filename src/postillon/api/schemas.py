@@ -1,14 +1,37 @@
-"""The bodies the API returns (see docs/api.md); the manifest a producer sends is `postillon.manifest`."""
+"""The bodies the API returns and the record it receives (see docs/api.md); the manifest a producer
+sends is `postillon.manifest`."""
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints, computed_field, field_validator
 
 from postillon.domain import Status
+from postillon.manifest import Manifest
 from postillon.platforms import POSTS
+
+
+class PublicationIn(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    at: AwareDatetime
+    remote_id: Annotated[str, StringConstraints(min_length=1, max_length=200)] | None = None
+
+    @field_validator("at")
+    @classmethod
+    def _in_utc(cls, at: datetime) -> datetime:
+        return at.astimezone(UTC)
+
+
+class RecordIn(BaseModel):
+    """An entry published outside the service: its manifest, and when each post went public."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    manifest: Manifest
+    published: dict[str, PublicationIn]
 
 
 class EventOut(BaseModel):

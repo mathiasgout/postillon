@@ -1,5 +1,5 @@
-"""The routes of the entries: submit one, read one and its video, list them, mark a manual post
-scheduled (see docs/api.md)."""
+"""The routes of the entries: submit one, record one published outside the service, read one and
+its video, list them, mark a manual post scheduled (see docs/api.md)."""
 
 from __future__ import annotations
 
@@ -12,10 +12,11 @@ from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from postillon.api.deps import SessionDep, SettingsDep, VideosDep
-from postillon.api.schemas import EntryOut, SubmissionOut
+from postillon.api.schemas import EntryOut, RecordIn, SubmissionOut
 from postillon.domain import Status
 from postillon.manifest import Manifest
-from postillon.services import entries
+from postillon.services import entries, recording
+from postillon.services.recording import Publication, RecordConflict, RecordRefused
 from postillon.services.scheduling import NotManual, PostNotFound, SchedulingConflict, mark_scheduled
 from postillon.services.submission import SubmissionConflict, SubmissionRefused, UnknownProject, submit
 
@@ -114,6 +115,36 @@ def list_entries(
 ) -> list[EntryOut]:
     """The entries, latest publication first, of one project or all, with a post of one status or any."""
     return [EntryOut.model_validate(e) for e in entries.find(session, project, post_status, limit, offset)]
+
+
+@router.post(
+    "/projects/{project}/entries/{key:path}/record",
+    status_code=status.HTTP_201_CREATED,
+    responses={404: {}, 409: {}, 422: {}},
+)
+def record_entry(
+    project: ProjectPath, key: KeyPath, body: RecordIn, session: SessionDep, settings: SettingsDep
+) -> EntryOut:
+    """Records an entry published outside the service, each post `published` at its time. Never
+    changes an existing entry."""
+    published = {name: Publication(at=p.at, remote_id=p.remote_id) for name, p in body.published.items()}
+    try:
+        recording.record(
+            session,
+            settings,
+            project=project,
+            key=key,
+            manifest=body.manifest,
+            published=published,
+            now=datetime.now(UTC),
+        )
+    except UnknownProject as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
+    except RecordRefused as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
+    except RecordConflict as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    return EntryOut.model_validate(entries.get(session, project, key))
 
 
 @router.post("/projects/{project}/entries/{key:path}/posts/{platform}/scheduled", responses={404: {}, 409: {}, 422: {}})

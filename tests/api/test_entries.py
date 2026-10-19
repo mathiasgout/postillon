@@ -155,3 +155,57 @@ def test_refused_scheduling(client: TestClient, publish_at: str, path: str, stat
     response = client.post(f"{URL}{path}")
     assert response.status_code == status
     assert detail in response.json()["detail"]
+
+
+def record_body(**published: Any) -> dict[str, Any]:
+    return {
+        "manifest": {
+            "publish_at": "2026-10-12T18:00:00Z",
+            "posts": {"youtube": {"account": "main", "title": "Day 2"}, "tiktok": {"account": "main", "caption": "x"}},
+        },
+        "published": published
+        or {
+            "youtube": {"at": "2026-10-12T18:00:00Z", "remote_id": "abc"},
+            "tiktok": {"at": "2026-10-12T21:30:00+02:00"},
+        },
+    }
+
+
+def test_entry_published_outside_is_recorded(client: TestClient):
+    response = client.post(f"{URL}/record", json=record_body())
+    assert response.status_code == 201
+    body = response.json()
+    assert body["video_released_at"] is not None
+    posts = {p["platform"]: p for p in body["posts"]}
+    assert (posts["youtube"]["status"], posts["youtube"]["remote_id"]) == ("published", "abc")
+    assert posts["tiktok"]["events"] == [{"status": "published", "error": None, "at": "2026-10-12T19:30:00Z"}]
+    assert client.get(f"{URL}.mp4").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("url", "published", "status", "detail"),
+    [
+        ("/v1/projects/unknown/entries/day-2", None, 404, "not configured"),
+        (URL, {"youtube": {"at": "2026-10-12T18:00:00Z"}}, 422, "must name the platforms"),
+        (URL, {"youtube": {"at": "2026-10-12T18:00:00Z"}, "tiktok": {"at": "2099-10-12T18:00:00Z"}}, 422, "future"),
+    ],
+)
+def test_refused_records(client: TestClient, url: str, published: dict[str, Any] | None, status: int, detail: str):
+    response = client.post(f"{url}/record", json=record_body(**(published or {})))
+    assert response.status_code == status
+    assert detail in response.json()["detail"]
+
+
+def test_record_never_changes_an_entry(client: TestClient):
+    put(client, manifest())
+    response = client.post(f"{URL}/record", json=record_body())
+    assert response.status_code == 409
+    assert client.get(URL).json()["posts"][0]["status"] == "pending"
+
+
+def test_record_refuses_an_account_not_configured(client: TestClient):
+    body = record_body()
+    body["manifest"]["posts"]["youtube"]["account"] = "other"
+    response = client.post(f"{URL}/record", json=body)
+    assert response.status_code == 422
+    assert "not configured for youtube" in response.json()["detail"]
