@@ -1,6 +1,6 @@
-"""YouTube: the post in `post`, which producers use; the adapter that talks to YouTube lives
-apart, behind the `youtube` extra."""
+"""YouTube: its post and account settings here, its client in `client`, behind the `youtube` extra."""
 
-from postillon.platforms.youtube.post import YouTube
+from postillon.platforms.youtube.post import YouTubePost
+from postillon.platforms.youtube.settings import YouTubeAccount
 
-__all__ = ["YouTube"]
+__all__ = ["YouTubeAccount", "YouTubePost"]

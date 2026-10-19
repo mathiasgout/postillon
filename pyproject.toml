@@ -1,14 +1,21 @@
 [project]
 name = "postillon"
-version = "0.1.0"
-description = "Publishes videos to their platforms from manifests dropped in an S3-compatible bucket"
+version = "0.2.0"
+description = "Publishes videos to their platforms at their time, from entries submitted to its HTTP API"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.0",
     "boto3>=1.43.114",
+    "fastapi>=0.149.0",
+    "pydantic>=2.14.1",
+    "pydantic-settings>=2.16.0",
     "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.1.5",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [project.scripts]
@@ -17,6 +24,7 @@ postillon = "postillon.cli:main"
 [project.optional-dependencies]
 youtube = [
     "google-api-python-client>=2.201.0",
+    "google-auth>=2.62.0",
 ]
 instagram = []
 
@@ -29,5 +37,34 @@ packages = ["src/postillon"]
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.15.1",
+    "mypy>=2.4.0",
     "pytest>=9.1.1",
+    "ruff>=0.17.1",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "PL", "PT"]
+ignore = ["PLR0913", "PLR2004"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["googleapiclient.*", "google.oauth2.*", "boto3", "botocore.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff.lint.per-file-ignores]
+# A route takes its inputs as parameters, as many as the request carries.
+"src/postillon/api/routes/*" = ["PLR0917"]
+# A parametrized test takes each case as a parameter.
+"tests/*" = ["PLR0917"]

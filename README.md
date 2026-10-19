@@ -1,25 +1,23 @@
 # postillon
 
-postillon publishes videos to their platforms, each at its scheduled time, from entries
-that producers drop in an S3-compatible bucket. One package, two sides: producers submit
-entries through its Python API, and its service reads them and talks to the platforms.
+postillon publishes videos to their platforms (YouTube, Instagram), each at its time. Producers
+submit entries to its HTTP API, a video with one post per platform; its worker publishes them
+and records every status in a SQLite database.
 
-A producer only writes to the bucket and never reads from it; the service alone holds
-the platform credentials.
+A post that may have reached its platform is never modified: a new submission changes only
+the posts not sent yet.
 
 ## Documentation
 
-- `docs/submit-a-video.md`: install postillon on the producer side and submit an entry.
-- `docs/environment.md`: the variables both sides use to reach the bucket.
-- `docs/run-the-service.md`: install and run the service, as a command or a systemd service.
-- `docs/configuration.md`: the projects and accounts the service serves.
-- `docs/bucket.md`: how projects, manifests, videos and states are laid out, and the
-  lifecycle of an entry.
+- `docs/submit-an-entry.md`: submit an entry from a producer.
+- `docs/api.md`: the routes of the API, their bodies and their errors.
 - `docs/manifest.md`: the manifest of an entry, its fields and its validation.
-- `docs/state.md`: the state the service keeps per entry, its statuses and how manifest
-  changes show.
-- `docs/youtube.md`: the YouTube platform, its accounts, its post, its behavior and its state.
-- `docs/instagram.md`: the Instagram platform, its accounts and their token renewal, its
-  post, its behavior and its state.
-- `docs/add-a-platform.md`: the post and the adapter a new platform provides.
-- `docs/tests.md`: run the tests.
+- `docs/statuses.md`: the statuses of a post, when the worker steps it, and when the video goes.
+- `docs/youtube.md`: the YouTube platform, its accounts, its post and its behavior.
+- `docs/instagram.md`: the Instagram platform, its accounts and their tokens, its post and its behavior.
+- `docs/run-the-service.md`: install, migrate and run the API and the worker, under systemd.
+- `docs/configuration.md`: `postillon.toml`, the projects and their accounts.
+- `docs/environment.md`: the environment variables, secrets included.
+- `docs/bucket.md`: what the service keeps in its S3-compatible bucket.
+- `docs/add-a-platform.md`: the post, the account settings and the client a new platform provides.
+- `docs/tests.md`: run the tests, the lint and the type checks.

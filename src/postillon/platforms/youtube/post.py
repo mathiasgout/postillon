@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import dataclasses
+from typing import Annotated, ClassVar
 
-from postillon.platforms.base import Post
+from pydantic import StringConstraints, field_validator
+
+from postillon.platforms.base import PlatformPost
 
 # Limits of the YouTube Data API v3: a title counts characters, a description bytes.
 TITLE_CHARS = 100
@@ -12,33 +14,33 @@ DESCRIPTION_BYTES = 5000
 FORBIDDEN = ("<", ">")
 
 
-@dataclasses.dataclass(frozen=True, kw_only=True)
-class YouTube(Post):
-    name = "youtube"
+class YouTubePost(PlatformPost):
+    name: ClassVar[str] = "youtube"
 
-    title: str
+    title: Annotated[str, StringConstraints(min_length=1, max_length=TITLE_CHARS)]
     description: str = ""
-    category_id: str = "22"
+    category_id: Annotated[str, StringConstraints(pattern=r"^[0-9]+$")] = "22"
     made_for_kids: bool = False
     contains_synthetic_media: bool = False
 
-    def validate(self) -> None:
-        super().validate()
-        for field in ("title", "description", "category_id"):
-            if not isinstance(getattr(self, field), str):
-                raise ValueError(f"youtube: {field} must be a string")
-        for field in ("made_for_kids", "contains_synthetic_media"):
-            if not isinstance(getattr(self, field), bool):
-                raise ValueError(f"youtube: {field} must be a boolean")
-        if not self.title.strip():
-            raise ValueError("youtube: title is empty")
-        if len(self.title) > TITLE_CHARS:
-            raise ValueError(f"youtube: title is {len(self.title)} characters, limit {TITLE_CHARS}")
-        size = len(self.description.encode())
+    @field_validator("title")
+    @classmethod
+    def _title_not_blank(cls, title: str) -> str:
+        if not title.strip():
+            raise ValueError("title is blank")
+        return title
+
+    @field_validator("description")
+    @classmethod
+    def _description_fits(cls, description: str) -> str:
+        size = len(description.encode())
         if size > DESCRIPTION_BYTES:
-            raise ValueError(f"youtube: description is {size} bytes, limit {DESCRIPTION_BYTES}")
-        for field in ("title", "description"):
-            if any(c in getattr(self, field) for c in FORBIDDEN):
-                raise ValueError(f"youtube: {field} contains < or >")
-        if not self.category_id.isdigit():
-            raise ValueError(f"youtube: category_id {self.category_id!r} is not a number")
+            raise ValueError(f"description is {size} bytes, limit {DESCRIPTION_BYTES}")
+        return description
+
+    @field_validator("title", "description")
+    @classmethod
+    def _no_angle_brackets(cls, text: str) -> str:
+        if any(c in text for c in FORBIDDEN):
+            raise ValueError("contains < or >")
+        return text

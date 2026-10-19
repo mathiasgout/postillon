@@ -1,15 +1,12 @@
 # Environment
 
-Both sides reach the bucket with the same variables. The service needs more for the
-platforms, described by each platform's document.
+Secrets come from environment variables, completed by the `.env` file of the working
+directory, which never overrides a variable already set. postillon never writes `.env`.
 
-| Variable | Role |
+| Variable | Meaning |
 | --- | --- |
-| `POSTILLON_S3_ENDPOINT` | Endpoint URL of the S3-compatible storage, `https://<account>.r2.cloudflarestorage.com` on R2. |
-| `POSTILLON_S3_ACCESS_KEY_ID` | Access key of an API token with read and write access to the bucket. |
-| `POSTILLON_S3_SECRET_ACCESS_KEY` | Secret of that access key. |
-| `POSTILLON_BUCKET` | Bucket name. |
+| `POSTILLON_BUCKET__SECRET_ACCESS_KEY` | Secret key of the bucket's credentials. |
+| `POSTILLON_YOUTUBE_CLIENT_ID`, `POSTILLON_YOUTUBE_CLIENT_SECRET` | The OAuth client of the YouTube accounts, unless an account names its own (see `youtube.md`). |
+| The variable each account names | Its refresh token (`refresh_token_env`, see `youtube.md`) or access token (`access_token_env`, see `instagram.md`). |
 
-The variables are read from the process environment, and from a `.env` file found from
-the working directory upwards; a variable set in the process wins. postillon never
-writes this file: the operator places every secret in it.
+Any key of `postillon.toml` can also be set here (see `configuration.md`).

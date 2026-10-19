@@ -1,4 +1,2 @@
-from postillon.bucket import Bucket
-from postillon.entry import Entry
-
-__all__ = ["Bucket", "Entry"]
+"""postillon publishes videos to their platforms, each at its time, from the entries producers
+submit to its HTTP API."""

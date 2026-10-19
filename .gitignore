@@ -6,3 +6,8 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .DS_Store
+.mypy_cache/
+.coverage
+# A deployment's own files: its configuration and its data (database, videos, tokens).
+postillon.toml
+data/

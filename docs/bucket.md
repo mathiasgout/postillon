@@ -1,33 +1,20 @@
-# Bucket layout
+# Bucket
 
-Producers and the service exchange nothing but objects in one S3-compatible bucket
-(Cloudflare R2). The bucket holds several projects side by side, one prefix each, and
-every object has exactly one writer.
+The service keeps two things in one S3-compatible bucket (Cloudflare R2), and is its only
+writer. Producers never reach it.
 
 ```
-<project>/manifests/<entry>.json   written by the producer, read by the service
-<project>/videos/<entry>.mp4       written by the producer, read then deleted by the service
-<project>/states/<entry>.json      written and read by the service only
+<project>/videos/<key>.mp4         a video a platform fetches by signed URL
+_postillon/backups/<date>.sqlite3  a daily copy of the database
 ```
 
-A producer writes under its own project prefix and never reads anything back. The service
-lists the prefixes of the projects declared in its configuration and ignores the others.
+- **Videos**: the service copies a video to the bucket when a platform asks for a URL,
+  Instagram for a Reel, and deletes it once every platform holds the video (see
+  `statuses.md`). A signed URL reads the video without credentials until it expires.
+- **Backups**: the worker uploads a consistent copy of the database on its first pass of
+  each day, in UTC, and after each start; a failed backup is tried again after the next
+  pass. The prefix lies outside the project alphabet, so that no project can collide
+  with it. postillon deletes no backup.
 
-## Names
-
-- **Project**: lowercase letters, digits and `-`.
-- **Entry**: one video to publish on one or more platforms. Lowercase letters, digits,
-  `-`, `_` and `/`; unique within its project and never reused, even after publication.
-
-## Lifecycle
-
-1. The producer submits the entry: the video first, then the manifest, so that a
-   discovered manifest always finds its video (see `submit-a-video.md`).
-2. The service lists each project's `manifests/` at a fixed interval. It reads a manifest
-   when it is new or its ETag changed, and hands every post that needs work to its
-   platform's adapter (see `state.md`).
-3. To change a publication, the producer submits the entry again. The service applies the
-   change on the posts it has not sent to their platform yet (see `state.md`).
-4. Once every post of the entry is `scheduled` or `published`, its platform holds the
-   video and the service deletes the bucket copy. A bucket lifecycle rule removes the
-   manifest and the state later; the service forgets an entry whose manifest is gone.
+The credentials need read, write and delete access to this bucket only (see
+`configuration.md` and `environment.md`).
