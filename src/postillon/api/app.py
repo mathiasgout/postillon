@@ -1,10 +1,13 @@
-"""The FastAPI application: its state, its routes under `/v1` and its health check (see docs/api.md)."""
+"""The FastAPI application: its state, its routes under `/v1`, its health check (see docs/api.md) and
+the administration page at `/` (see docs/admin-page.md)."""
 
 from __future__ import annotations
 
 from importlib.metadata import version
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from postillon.api.routes import entries
 from postillon.db.session import check_schema, connect, sessions
@@ -26,4 +29,6 @@ def create_app(settings: Settings) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    # Mounted last: the routes above take precedence over its catch-all path.
+    app.mount("/", StaticFiles(directory=Path(__file__).parent.parent / "web", html=True), name="web")
     return app

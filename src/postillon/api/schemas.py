@@ -5,9 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from postillon.domain import Status
+from postillon.platforms import POSTS
 
 
 class EventOut(BaseModel):
@@ -30,6 +31,11 @@ class PostOut(BaseModel):
     extra: dict[str, Any]
     updated_at: datetime
     events: list[EventOut]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def manual(self) -> bool:
+        return POSTS[self.platform].manual
 
 
 class EntryOut(BaseModel):

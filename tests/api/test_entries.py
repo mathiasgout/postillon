@@ -94,6 +94,18 @@ def test_health(client: TestClient):
     assert client.get("/health").json() == {"status": "ok"}
 
 
+def test_admin_page_is_served_beside_the_routes(client: TestClient):
+    page = client.get("/")
+    assert page.status_code == 200
+    assert page.headers["content-type"].startswith("text/html")
+    assert '<script src="app.js">' in page.text
+    for asset in ("/app.js", "/style.css"):
+        assert client.get(asset).status_code == 200
+    assert client.get("/docs").status_code == 200
+    assert client.get("/v1/entries").json() == []
+    assert client.get("/missing.js").status_code == 404
+
+
 def test_app_refuses_a_database_not_migrated(settings: Settings):
     with pytest.raises(ValueError, match="run `postillon migrate`"):
         create_app(settings)
@@ -127,6 +139,7 @@ def test_manual_post_is_marked_scheduled(client: TestClient):
     assert posts["tiktok"]["status"] == "scheduled"
     assert [e["status"] for e in posts["tiktok"]["events"]] == ["pending", "scheduled"]
     assert posts["youtube"]["status"] == "pending"
+    assert (posts["tiktok"]["manual"], posts["youtube"]["manual"]) == (True, False)
 
 
 @pytest.mark.parametrize(

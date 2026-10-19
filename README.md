@@ -12,6 +12,7 @@ the posts not sent yet.
 
 - `docs/submit-an-entry.md`: submit an entry from a producer.
 - `docs/api.md`: the routes of the API, their bodies and their errors.
+- `docs/admin-page.md`: the administration page, its posts to schedule and its entries.
 - `docs/manifest.md`: the manifest of an entry, its fields and its validation.
 - `docs/statuses.md`: the statuses of a post, when the worker steps it, and when the video goes.
 - `docs/youtube.md`: the YouTube platform, its accounts, its post and its behavior.

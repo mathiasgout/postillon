@@ -11,6 +11,7 @@ The API serves JSON under `/v1`; an interactive description of every route is se
 | `POST /v1/projects/{project}/entries/{key}/posts/{platform}/scheduled` | Mark a post of a manual platform scheduled. |
 | `GET /v1/entries` | The entries, latest publication time first. |
 | `GET /health` | `{"status": "ok"}` while the API serves. |
+| `GET /` | The administration page (see `admin-page.md`). |
 
 ## Names
 
@@ -63,6 +64,7 @@ A submission is checked whole before anything is written. On a replacement:
 | Post field | Meaning |
 | --- | --- |
 | `platform`, `account` | Where the post goes. |
+| `manual` | `true` when the operator schedules the post on its platform (see `tiktok.md`). |
 | `status` | See `statuses.md`. |
 | `remote_id` | Identifier of the video on the platform, once known. |
 | `error` | Reason of the latest failure or rejection, `null` otherwise. |
