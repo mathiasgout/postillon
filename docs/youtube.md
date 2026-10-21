@@ -9,7 +9,9 @@ It needs the `youtube` extra: `postillon[youtube]`.
 ## Account
 
 An account designates one YouTube channel, authorized by a refresh token of an OAuth
-client of a Google Cloud project with the YouTube Data API v3 enabled.
+client of a Google Cloud project with the YouTube Data API v3 enabled. The project needs
+no audit to publish, and its default quota of 100 uploads a day is shared by every
+channel it authorizes.
 
 ```toml
 [projects.my-project.youtube.my-youtube]
