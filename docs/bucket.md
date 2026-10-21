@@ -14,7 +14,8 @@ _postillon/backups/<date>.sqlite3  a daily copy of the database
 - **Backups**: the worker uploads a consistent copy of the database on its first pass of
   each day, in UTC, and after each start; a failed backup is tried again after the next
   pass. The prefix lies outside the project alphabet, so that no project can collide
-  with it. postillon deletes no backup.
+  with it. postillon deletes no backup. Without a backup, a lost disk would make the
+  service forget the posts in progress and send again a video a platform already holds.
 
 The credentials need read, write and delete access to this bucket only (see
 `configuration.md` and `environment.md`).
