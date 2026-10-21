@@ -134,13 +134,16 @@ def _state(post: Post) -> PostState:
 
 
 def _record(post: Post, new: PostState, now: datetime) -> None:
-    """Writes the platform's state on the post, dated and logged when it changes."""
-    failures = post.failures + 1 if new.status == Status.FAILED else 0
+    """Writes the platform's state on the post, dated and logged when it changes; the attempts that
+    follow a failure leave no event until one of them succeeds."""
+    # The checkpoint of an attempt keeps the count, without which the retry delay never grows.
+    retrying = post.failures > 0 and new.status in (Status.IN_PROGRESS, Status.FAILED)
+    failures = post.failures + 1 if new.status == Status.FAILED else post.failures if retrying else 0
     error = new.error if new.status in (Status.FAILED, Status.REJECTED) else None
     values = (new.status, new.remote_id, error, new.extra, failures)
     if values == (post.status, post.remote_id, post.error, post.extra, post.failures):
         return
-    if new.status != post.status:
+    if new.status != post.status and not retrying:
         entry = post.entry
         log.info(
             "%s/%s %s: %s -> %s%s",

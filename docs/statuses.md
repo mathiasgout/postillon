@@ -1,7 +1,9 @@
 # Statuses
 
 Each post of an entry has a status, which the worker changes as it acts on the platform.
-Every change is recorded as an event of the post (see `api.md`).
+Every change is recorded as an event of the post (see `api.md`), except during the retries
+of a `failed` post: its history holds the first failure, then the outcome of the attempt
+that succeeds or rejects it, and the post itself carries the count and the latest error.
 
 | Status | Meaning |
 | --- | --- |
@@ -23,7 +25,8 @@ that has something due to its platform:
 - a `pending` or `in_progress` post, on every pass; the platform decides when it acts,
   and may leave the post unchanged until `publish_at`;
 - a `failed` post, once its retry delay has passed since its latest change: 1 minute
-  after the first failure, twice as long after each new one, 1 hour at most;
+  after the first failure, twice as long after each new one, 1 hour at most; the
+  intermediate state of an attempt keeps the count;
 - a `scheduled` post, once `publish_at` is reached, for the platform to confirm the
   publication;
 - never a `published` or `rejected` post.

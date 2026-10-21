@@ -124,6 +124,29 @@ def test_checkpoint_is_kept_when_the_step_fails(publisher, platform, send, sessi
     assert [e.status for e in failed.events] == [Status.PENDING, Status.IN_PROGRESS, Status.FAILED]
 
 
+def test_retries_after_a_checkpoint_are_spaced_and_leave_no_event(publisher, platform, send, session_factory):
+    send()
+
+    def interrupted(task: Task) -> PostState:
+        task.checkpoint(dataclasses.replace(task.state, status=Status.IN_PROGRESS, extra={"uploading": True}))
+        raise ConnectionError("reset")
+
+    platform.behaviour = interrupted
+    for minutes in (0, 1, 3):
+        publisher.run_pass(BEFORE + timedelta(minutes=minutes))
+    publisher.run_pass(BEFORE + timedelta(minutes=6, seconds=59))
+    assert len(platform.tasks) == 3
+    failed = post(session_factory)
+    assert (failed.status, failed.failures) == (Status.FAILED, 3)
+    assert [e.status for e in failed.events] == [Status.PENDING, Status.IN_PROGRESS, Status.FAILED]
+
+    platform.behaviour = lambda task: dataclasses.replace(task.state, status=Status.SCHEDULED, remote_id="v1", extra={})
+    publisher.run_pass(BEFORE + timedelta(minutes=7))
+    scheduled = post(session_factory)
+    assert (scheduled.status, scheduled.failures) == (Status.SCHEDULED, 0)
+    assert [(e.status, e.at) for e in scheduled.events][-1] == (Status.SCHEDULED, BEFORE + timedelta(minutes=7))
+
+
 def test_post_of_an_unconfigured_account_is_rejected(publisher, platform, send, session_factory, settings: Settings):
     send()
     publisher.settings = settings.model_copy(
