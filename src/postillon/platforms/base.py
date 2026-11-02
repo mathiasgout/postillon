@@ -64,11 +64,12 @@ class Platform(Protocol):
 
 
 @runtime_checkable
-class RenewsCredentials(Protocol):
-    """A platform whose credentials expire unless renewed; the worker calls it once a day."""
+class ChecksCredentials(Protocol):
+    """A platform whose credentials expire; the worker calls it once a day."""
 
-    def renew_credentials(self, now: datetime) -> None:
-        """Renews the credentials that are due; logs a failure and keeps the current ones."""
+    def check_credentials(self, now: datetime) -> None:
+        """Renews the credentials that are due, or warns before they expire; logs a failure and keeps
+        the current ones."""
         ...
 
 

@@ -17,7 +17,7 @@ from types import FrameType
 from postillon.db.session import check_schema, connect, sessions
 from postillon.platforms.loader import load_platforms
 from postillon.services.backup import back_up
-from postillon.services.credentials import renew_credentials
+from postillon.services.credentials import check_credentials
 from postillon.services.publishing import Publisher
 from postillon.settings import Settings
 from postillon.storage.bucket import Bucket
@@ -31,7 +31,7 @@ def run(settings: Settings) -> None:
     extra or a secret is not ready."""
     engine = connect(settings.database)
     check_schema(engine)
-    platforms = {name: load_platforms(project, settings.data_dir) for name, project in settings.projects.items()}
+    platforms = {name: load_platforms(project) for name, project in settings.projects.items()}
     bucket = Bucket.connect(settings.bucket)
     videos = VideoStore(settings.videos_dir, settings.max_video_bytes)
     publisher = Publisher(sessions(engine), settings, platforms, videos, bucket)
@@ -47,7 +47,7 @@ def run(settings: Settings) -> None:
     daily = DailyJobs(
         {
             "backup": lambda now: back_up(settings.database, bucket, now.date()),
-            "credentials renewal": lambda now: renew_credentials(platforms, now),
+            "credentials check": lambda now: check_credentials(platforms, now),
         }
     )
     while not stop.is_set():

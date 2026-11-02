@@ -29,7 +29,7 @@ handle = "@mychannel"
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `data_dir` | `data` | Holds the database `postillon.db`, the videos waiting for their platforms (`videos/`) and the renewed Instagram tokens. |
+| `data_dir` | `data` | Holds the database `postillon.db` and the videos waiting for their platforms (`videos/`). |
 | `poll_seconds` | `60` | Interval between two passes of the worker. |
 | `max_video_bytes` | 1 GiB | Largest video the API accepts. |
 | `bucket.endpoint`, `bucket.access_key_id`, `bucket.name` | | The S3-compatible bucket (see `bucket.md`); its secret key comes from the environment. |

@@ -54,7 +54,7 @@ class Settings(BaseSettings):
         frozen=True,
     )
 
-    # Holds the database, the videos waiting for their platforms and the renewed tokens.
+    # Holds the database and the videos waiting for their platforms.
     data_dir: Path = Path("data")
     poll_seconds: PositiveInt = 60
     # YouTube accepts far larger files, but a short vertical video stays well under it.

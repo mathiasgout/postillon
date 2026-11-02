@@ -16,7 +16,7 @@ postillon worker
 | --- | --- |
 | `postillon migrate` | Brings the database schema to the latest version; run after every install or upgrade. |
 | `postillon api [--host 127.0.0.1] [--port 8000]` | Serves the API (see `api.md`); `--host 0.0.0.0` serves the local network. |
-| `postillon worker` | Runs a pass every `poll_seconds` (see `statuses.md`). Once a day, it backs the database up to the bucket (see `bucket.md`) and renews the credentials that expire unless renewed (see `instagram.md`). |
+| `postillon worker` | Runs a pass every `poll_seconds` (see `statuses.md`). Once a day, it backs the database up to the bucket (see `bucket.md`) and checks the credentials that expire (see `instagram.md`). |
 
 Both processes refuse to start, with exit status 2, on an invalid configuration, a missing
 secret or platform extra, or a database whose schema is not current. They log to standard

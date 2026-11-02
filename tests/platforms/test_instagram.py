@@ -1,6 +1,6 @@
 import io
 import json
-import stat
+import logging
 from datetime import UTC, datetime, timedelta
 from urllib.error import HTTPError
 
@@ -22,23 +22,30 @@ USER_ID = "17841"
 
 
 class FakeInstagram:
-    """The Graph API of one account, with its containers by identifier."""
+    """The Graph API seen through the Page token of one account, with its containers by identifier."""
 
     def __init__(self):
         self.username = "mychannel"
         self.containers = {}
         self.created = []
         self.calls = []
-        self.renewed = []
         self.refusal = None
-        self.renewal_refusal = None
+        self.page_refusal = None
+        self.token_info = {"is_valid": True, "data_access_expires_at": int((BEFORE + timedelta(days=60)).timestamp())}
 
     def request(self, method, path, params, token):
         self.calls.append((method, path, token))
         if self.refusal:
             raise self.refusal
         if path == "me":
-            return {"user_id": USER_ID, "username": self.username}
+            if self.page_refusal:
+                raise self.page_refusal
+            if self.username is None:
+                return {"id": "page"}
+            return {"id": "page", "instagram_business_account": {"id": USER_ID, "username": self.username}}
+        if path == "debug_token":
+            assert params == {"input_token": token}
+            return {"data": self.token_info}
         if path == f"{USER_ID}/media":
             self.created.append(params)
             container = f"c{len(self.created)}"
@@ -48,12 +55,6 @@ class FakeInstagram:
             self.containers[params["creation_id"]] = "PUBLISHED"
             return {"id": "m1"}
         return {"status_code": self.containers[path], "status": "Error: unsupported codec"}
-
-    def refresh(self, token):
-        if self.renewal_refusal:
-            raise self.renewal_refusal
-        self.renewed.append(token)
-        return f"{token}+"
 
 
 class FakeVideo:
@@ -65,7 +66,6 @@ class FakeVideo:
 def api(monkeypatch):
     fake = FakeInstagram()
     monkeypatch.setattr(instagram_client, "_request", fake.request)
-    monkeypatch.setattr(instagram_client, "_refresh", fake.refresh)
     return fake
 
 
@@ -75,13 +75,8 @@ def secrets(monkeypatch):
 
 
 @pytest.fixture
-def tokens(tmp_path):
-    return tmp_path / "instagram-tokens.json"
-
-
-@pytest.fixture
-def step(api, tokens):
-    platform = InstagramPlatform(ACCOUNTS, tokens)
+def step(api):
+    platform = InstagramPlatform(ACCOUNTS)
 
     def step(state=NO_STATE, now=PUBLISH_AT, next_publish_at=None, **post):
         task = Task(
@@ -115,10 +110,10 @@ def test_invalid_account_settings(settings, message):
         InstagramAccount(**settings)
 
 
-def test_missing_secret_refuses_the_start(monkeypatch, tokens):
+def test_missing_secret_refuses_the_start(monkeypatch):
     monkeypatch.delenv("MY_INSTAGRAM_TOKEN")
     with pytest.raises(ValueError, match="MY_INSTAGRAM_TOKEN"):
-        InstagramPlatform(ACCOUNTS, tokens)
+        InstagramPlatform(ACCOUNTS)
 
 
 def test_post_waits_for_its_publication_time(step, api):
@@ -207,7 +202,28 @@ def test_token_of_another_account_is_refused(step, api):
     assert api.created == []
 
 
+def test_page_without_instagram_account_is_refused(step, api):
+    api.username = None
+    with pytest.raises(ValueError, match="linked to no Instagram account, expected mychannel"):
+        step()
+    assert api.created == []
+
+
+def test_token_that_is_not_a_page_token_fails_the_post(step, api):
+    api.page_refusal = GraphError(400, {"code": 100, "message": "Tried accessing nonexisting field"})
+    with pytest.raises(ValueError, match="set a Page access token"):
+        step()
+    assert api.created == []
+
+
+def test_account_is_read_once(step, api):
+    step(now=BEFORE)
+    step(now=BEFORE)
+    assert [call for call in api.calls if call[1] == "me"] == [("GET", "me", "seed")]
+
+
 def test_refusal_rejects_the_post(step, api):
+    step(now=BEFORE)
     api.refusal = GraphError(400, {"code": 100, "message": "Invalid parameter"})
     new = step(state=in_container())
     assert (new.status, new.extra) == (Status.REJECTED, {})
@@ -231,55 +247,47 @@ def test_transient_errors_are_raised(step, api, status, error):
 
 
 @pytest.fixture
-def platform(api, tokens):
-    return InstagramPlatform(ACCOUNTS, tokens)
+def platform(api):
+    return InstagramPlatform(ACCOUNTS)
 
 
-def test_first_renewal_renews_the_token_of_the_environment(platform, api, tokens):
-    platform.renew_credentials(BEFORE)
-    assert api.renewed == ["seed"]
-    assert json.loads(tokens.read_text())["MY_INSTAGRAM_TOKEN"]["token"] == "seed+"
-    assert stat.S_IMODE(tokens.stat().st_mode) == 0o600
+def expiring_in(days):
+    return int((BEFORE + timedelta(days=days)).timestamp())
 
 
-def test_steps_use_the_renewed_token_without_renewing(step, platform, api):
-    step(now=BEFORE)
-    assert api.renewed == []
-    assert api.calls[-1][2] == "seed"
-    platform.renew_credentials(BEFORE)
-    step(now=PUBLISH_AT)
-    assert api.calls[-1] == ("POST", f"{USER_ID}/media", "seed+")
+def test_distant_data_access_is_logged(platform, api, caplog):
+    caplog.set_level(logging.INFO)
+    platform.check_credentials(BEFORE)
+    assert ("GET", "debug_token", "seed") in api.calls
+    assert "instagram account my-instagram: data access until 2026-12-18" in caplog.text
 
 
-def test_token_is_renewed_again_after_a_week(platform, api):
-    platform.renew_credentials(BEFORE)
-    platform.renew_credentials(BEFORE + timedelta(days=6))
-    assert api.renewed == ["seed"]
-    platform.renew_credentials(BEFORE + timedelta(days=7))
-    assert api.renewed == ["seed", "seed+"]
+def test_data_access_close_to_its_end_warns(platform, api, caplog):
+    api.token_info["data_access_expires_at"] = expiring_in(14)
+    platform.check_credentials(BEFORE)
+    assert [(r.levelno, r.getMessage()) for r in caplog.records] == [
+        (logging.WARNING, "instagram account my-instagram: data access lost on 2026-11-02, consent again")
+    ]
 
 
-def test_renewed_token_survives_a_restart(api, tokens):
-    instagram_client.Tokens(tokens).save("MY_INSTAGRAM_TOKEN", "seed", "seed+", BEFORE)
-    assert instagram_client.Tokens(tokens).current("MY_INSTAGRAM_TOKEN", "seed") == ("seed+", BEFORE)
+@pytest.mark.parametrize(
+    "info",
+    [
+        {"is_valid": True, "data_access_expires_at": expiring_in(0)},
+        {"is_valid": False, "data_access_expires_at": expiring_in(60)},
+    ],
+)
+def test_lost_data_access_or_invalid_token_is_an_error(platform, api, caplog, info):
+    api.token_info = info
+    platform.check_credentials(BEFORE)
+    assert [r.levelno for r in caplog.records] == [logging.ERROR]
+    assert "consent again" in caplog.text
 
 
-def test_token_placed_in_the_environment_replaces_the_renewed_one(platform, api, monkeypatch):
-    platform.renew_credentials(BEFORE)
-    monkeypatch.setenv("MY_INSTAGRAM_TOKEN", "new-seed")
-    platform.renew_credentials(BEFORE + timedelta(days=1))
-    assert api.renewed == ["seed", "new-seed"]
-
-
-def test_failed_renewal_keeps_the_token_and_waits_a_week(platform, api, caplog):
-    api.renewal_refusal = GraphError(400, {"code": 190, "message": "token too recent"})
-    platform.renew_credentials(BEFORE)
-    assert "token not renewed" in caplog.text
-    api.renewal_refusal = None
-    platform.renew_credentials(BEFORE + timedelta(days=1))
-    assert api.renewed == []
-    platform.renew_credentials(BEFORE + timedelta(days=7))
-    assert api.renewed == ["seed"]
+def test_failed_check_is_logged_and_keeps_the_service_running(platform, api, caplog):
+    api.refusal = GraphError(500, {"message": "temporary"})
+    platform.check_credentials(BEFORE)
+    assert "instagram account my-instagram: token not checked" in caplog.text
 
 
 def test_graph_error_is_read_from_the_response(monkeypatch):

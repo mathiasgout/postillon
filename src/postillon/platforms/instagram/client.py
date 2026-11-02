@@ -1,20 +1,17 @@
 """The Instagram platform: publishes each video as a Reel at `publish_at`, across passes, and
-renews the accounts' tokens (see docs/instagram.md).
+warns before the accounts' tokens lose their data access (see docs/instagram.md).
 
-Only module that talks to Instagram, through the Instagram API with Instagram Login, and only
-writer of the token file.
+Only module that talks to Instagram, through the Instagram API with Facebook Login and a Page
+access token per account.
 """
 
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import json
 import logging
-import os
 from collections.abc import Mapping
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urlencode
@@ -27,13 +24,14 @@ from postillon.platforms.instagram.settings import InstagramAccount
 
 log = logging.getLogger(__name__)
 
-API = "https://graph.instagram.com"
+API = "https://graph.facebook.com"
 API_VERSION = "v25.0"
 TIMEOUT_SECONDS = 60
 # Instagram fetches the video while it processes the container, within minutes.
 VIDEO_URL_SECONDS = 3600
-# A refresh needs a token at least 24 hours old and makes it valid 60 days: weekly leaves margin.
-REFRESH_AFTER = timedelta(days=7)
+# Meta cuts a token's data access 90 days after the user's last consent; two weeks of warnings
+# leave the operator time to consent again.
+WARN_BEFORE = timedelta(days=14)
 # Kept in the state between the creation of the Reel container and its publication.
 CONTAINER = "container_id"
 # Graph API error codes worth retrying: temporary failures, rate and publishing limits, and an
@@ -53,45 +51,12 @@ class GraphError(Exception):
         return self.status >= 500 or self.status == 429 or self.transient or self.code in RETRYABLE_CODES
 
 
-class Tokens:
-    """The renewed token of each account, by the variable that holds its first token. A renewed token
-    is used only while that variable keeps the token it was renewed from, so that a token the
-    operator places in the environment wins."""
-
-    def __init__(self, path: Path):
-        self.path = path
-
-    def current(self, variable: str, seed: str) -> tuple[str, datetime | None]:
-        """The token to use and when it was last renewed, never for the seed itself."""
-        record = self._read().get(variable)
-        if record and record["seed_sha256"] == _sha256(seed):
-            return str(record["token"]), datetime.fromisoformat(record["refreshed_at"])
-        return seed, None
-
-    def save(self, variable: str, seed: str, token: str, refreshed_at: datetime) -> None:
-        data = self._read()
-        data[variable] = {"seed_sha256": _sha256(seed), "token": token, "refreshed_at": refreshed_at.isoformat()}
-        partial = self.path.with_name(self.path.name + ".tmp")
-        fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            json.dump(data, f, indent=2)
-        # Replaced at once, so that a crash never leaves a truncated file and loses the tokens.
-        os.replace(partial, self.path)
-
-    def _read(self) -> dict[str, Any]:
-        try:
-            return dict(json.loads(self.path.read_text()))
-        except FileNotFoundError:
-            return {}
-
-
 class InstagramPlatform:
-    def __init__(self, accounts: Mapping[str, InstagramAccount], tokens: Path):
+    def __init__(self, accounts: Mapping[str, InstagramAccount]):
         self._accounts = dict(accounts)
         # Fails at start on a missing secret rather than on the first post.
         for account in self._accounts.values():
             read_secret(account.access_token_env)
-        self._tokens = Tokens(tokens)
         # The Instagram user identifier of each account, once its username is checked.
         self._users: dict[str, str] = {}
 
@@ -107,7 +72,7 @@ class InstagramPlatform:
         post = task.post
         assert isinstance(post, InstagramPost)
         state = task.state
-        token = self._token(post.account)
+        token = read_secret(self._accounts[post.account].access_token_env)
         user_id = self._user_id(post.account, token)
         container = state.extra.get(CONTAINER)
         if container is None:
@@ -125,36 +90,42 @@ class InstagramPlatform:
             return dataclasses.replace(state, status=Status.IN_PROGRESS, error=None, extra={CONTAINER: container})
         return _follow(state, str(container), user_id, token)
 
-    def renew_credentials(self, now: datetime) -> None:
-        """Renews each account's token once it is `REFRESH_AFTER` old; a failed renewal keeps the
-        current token, is logged, and is tried again after `REFRESH_AFTER`."""
+    def check_credentials(self, now: datetime) -> None:
+        """Logs, for each account, when its token loses its data access: a warning within
+        `WARN_BEFORE`, an error once lost or when the token is invalid."""
         for name, account in self._accounts.items():
-            variable = account.access_token_env
-            seed = read_secret(variable)
-            token, refreshed_at = self._tokens.current(variable, seed)
-            if refreshed_at is not None and now - refreshed_at < REFRESH_AFTER:
-                continue
+            token = read_secret(account.access_token_env)
             try:
-                token = _refresh(token)
-            except (GraphError, OSError) as e:
-                log.warning("instagram account %s: token not renewed: %s", name, e)
+                info = _request("GET", "debug_token", {"input_token": token}, token)["data"]
+            except (GraphError, OSError, KeyError) as e:
+                log.warning("instagram account %s: token not checked: %s", name, e)
+                continue
+            expires_at = datetime.fromtimestamp(info.get("data_access_expires_at", 0), UTC)
+            if not info.get("is_valid") or expires_at <= now:
+                log.error("instagram account %s: token invalid or data access lost, consent again", name)
+            elif expires_at - now <= WARN_BEFORE:
+                log.warning("instagram account %s: data access lost on %s, consent again", name, expires_at.date())
             else:
-                log.info("instagram account %s: token renewed", name)
-            self._tokens.save(variable, seed, token, now)
-
-    def _token(self, name: str) -> str:
-        """The account's latest renewed token, or the one of the environment."""
-        variable = self._accounts[name].access_token_env
-        return self._tokens.current(variable, read_secret(variable))[0]
+                log.info("instagram account %s: data access until %s", name, expires_at.date())
 
     def _user_id(self, name: str, token: str) -> str:
-        """The account's Instagram user identifier; raises ValueError when the token belongs to another account."""
+        """The Instagram user identifier of the account linked to the token's Page; raises ValueError
+        when the token is not a Page token or its Page is linked to another account."""
         if name not in self._users:
-            me = _request("GET", "me", {"fields": "user_id,username"}, token)
+            fields = {"fields": "instagram_business_account{id,username}"}
+            try:
+                page = _request("GET", "me", fields, token)
+            except GraphError as e:
+                if e.retryable:
+                    raise
+                raise ValueError(f"the token reads no Instagram account, set a Page access token: {e}") from None
+            account = page.get("instagram_business_account")
             expected = self._accounts[name].username
-            if me["username"].lower() != expected.lower():
-                raise ValueError(f"the token authorizes {me['username']}, not {expected}: set the right token")
-            self._users[name] = str(me["user_id"])
+            if account is None:
+                raise ValueError(f"the token's Page is linked to no Instagram account, expected {expected}")
+            if account["username"].lower() != expected.lower():
+                raise ValueError(f"the token authorizes {account['username']}, not {expected}: set the right token")
+            self._users[name] = str(account["id"])
         return self._users[name]
 
 
@@ -198,11 +169,6 @@ def _create_container(user_id: str, post: InstagramPost, video_url: str, token: 
     return str(_request("POST", f"{user_id}/media", params, token)["id"])
 
 
-def _refresh(token: str) -> str:
-    query = urlencode({"grant_type": "ig_refresh_token", "access_token": token})
-    return str(_send(Request(f"{API}/refresh_access_token?{query}"))["access_token"])
-
-
 def _request(method: str, path: str, params: dict[str, str], token: str) -> dict[str, Any]:
     """The JSON response of a Graph API call; raises GraphError when Instagram refuses it."""
     url = f"{API}/{API_VERSION}/{path}"
@@ -222,7 +188,3 @@ def _send(request: Request) -> dict[str, Any]:
         except ValueError:
             error = {}
         raise GraphError(e.code, error if isinstance(error, dict) else {}) from None
-
-
-def _sha256(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()

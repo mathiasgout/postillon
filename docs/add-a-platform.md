@@ -60,9 +60,10 @@ It records the platform's identifier of the video in `remote_id`, and what it ke
 two steps in `extra`, documented in the platform's document. An expected refusal returns
 `failed` or `rejected` with an `error`; any exception counts as `failed` (see `statuses.md`).
 
-A client whose credentials expire unless renewed also implements `renew_credentials(now)`
-(`RenewsCredentials`): the worker calls it once a day for every client, whether a post waits
-or not. It logs a failed renewal and keeps the current credentials.
+A client whose credentials expire also implements `check_credentials(now)`
+(`ChecksCredentials`): the worker calls it once a day for every client, whether a post waits
+or not. It renews the credentials that are due or warns before they expire, logs a failure
+and keeps the current credentials.
 
 `load_platforms` (`postillon/platforms/loader.py`) builds the client when the project has an
 account of the platform. The SDK goes in an extra of `pyproject.toml` named after the
