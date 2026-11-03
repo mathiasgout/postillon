@@ -1,6 +1,6 @@
 """The daily check of the platform credentials that expire (see docs/run-the-service.md).
 
-Runs whether or not a post waits, so that an account idle for weeks keeps valid credentials.
+Runs whether or not a post waits, so that an idle account still warns before its access ends.
 """
 
 from __future__ import annotations

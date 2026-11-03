@@ -23,6 +23,9 @@ access_token_env = "MY_INSTAGRAM_TOKEN"
 | `username` | yes | Username of the account. The worker refuses a token whose Page is linked to another account. |
 | `access_token_env` | yes | Variable holding the Page access token, with the `instagram_basic`, `instagram_content_publish`, `pages_show_list` and `pages_read_engagement` permissions. |
 
+When the role on the Page comes from a business portfolio, Meta also requires the
+`ads_management` and `ads_read` permissions.
+
 ## Get the token
 
 1. In the Graph API Explorer, select the app, add the four permissions and generate a user

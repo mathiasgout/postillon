@@ -1,5 +1,5 @@
 """The worker process: a publishing pass at a fixed interval, and daily jobs (the backup, the
-renewal of the credentials), until SIGTERM (see docs/run-the-service.md).
+check of the credentials), until SIGTERM (see docs/run-the-service.md).
 
 A stop request ends the loop after the current pass; systemd's stop timeout bounds the wait,
 and a pass cut short leaves `in_progress` posts that the next start resolves.
