@@ -4,8 +4,11 @@ The service is two processes sharing one SQLite database: `postillon api` serves
 `postillon worker` publishes. Both run from a working directory that holds `postillon.toml`
 (see `configuration.md`), the `.env` of the secrets (see `environment.md`) and `data_dir`.
 
+postillon is not published on PyPI: it installs from GitHub, pinned on a tag or a commit
+(`<ref>`).
+
 ```sh
-uv tool install 'postillon[youtube,instagram]'
+uv tool install 'postillon[youtube,instagram] @ git+https://github.com/mathiasgout/postillon@<ref>'
 cd /opt/postillon
 postillon migrate
 postillon api --host 0.0.0.0
