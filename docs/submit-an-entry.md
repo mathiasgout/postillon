@@ -1,20 +1,20 @@
 # Submit an entry
 
-An entry is one video to publish on one or more platforms. A producer submits it with one
-`PUT` to the API (see `api.md`): the manifest as JSON (see `manifest.md`) and the MP4 video,
-as `multipart/form-data`.
+An entry is one video to publish on one or more platforms. A producer submits it in two
+requests to the API (see `api.md`): the manifest first, as JSON (see `manifest.md`), then
+the MP4 video. The entry exists from the manifest on; its posts wait for the video.
 
 ```sh
-curl -X PUT http://localhost:8000/v1/projects/my-project/entries/season-1/day-23 \
-  -F 'entry=<day-23.json' \
-  -F 'video=@day-23.mp4;type=video/mp4'
+curl -X PUT http://localhost:8000/v1/projects/my-project/entries/day-23 \
+  -H 'Content-Type: application/json' --data @day-23.json
+curl -X PUT http://localhost:8000/v1/projects/my-project/entries/day-23/video \
+  -H 'Content-Type: video/mp4' --data-binary @day-23.mp4
 ```
 
 ```python
-import json
-
 import httpx
 
+entry = "http://localhost:8000/v1/projects/my-project/entries/day-23"
 manifest = {
     "publish_at": "2026-10-22T18:00:00Z",
     "posts": {
@@ -22,25 +22,25 @@ manifest = {
         "instagram": {"account": "main", "caption": "Pasta in ten minutes #cooking"},
     },
 }
+httpx.put(entry, json=manifest).raise_for_status()
 with open("day-23.mp4", "rb") as video:
-    response = httpx.put(
-        "http://localhost:8000/v1/projects/my-project/entries/season-1/day-23",
-        data={"entry": json.dumps(manifest)},
-        files={"video": ("day-23.mp4", video, "video/mp4")},
-        timeout=300,
-    )
-response.raise_for_status()
+    httpx.put(f"{entry}/video", content=video, headers={"Content-Type": "video/mp4"}, timeout=300).raise_for_status()
 ```
 
-The key, `season-1/day-23` here, is chosen by the producer and never reused within its
-project. Submitting the same key again replaces the entry; the video may then be left out
-while the service holds it.
+The key, `day-23` here, is chosen by the producer and never reused within its project.
+Submitting the same key again replaces the manifest; the video is sent again only when it
+changes, and sending the same bytes changes nothing.
 
-## The answer
+## The answers
 
-- **201 or 200**: the entry is created or replaced. `ignored` lists the platforms whose
-  post may have reached its platform already and stays as it was sent.
-- **422**: the entry is refused, with the reason in `detail`; nothing is written.
-- **409**: the worker changed a post of the entry meanwhile; submitting again settles it.
+- **201 or 200** for the manifest, **201 or 204** for the video: the entry or its video is
+  created or replaced. A post that may have reached its platform keeps what it was sent
+  with, and says so by `outdated`.
+- **4xx**: the request is refused, with its `type` and `detail` (see `api.md`); nothing is
+  written.
+- **409** `changed-meanwhile`: the worker changed the entry meanwhile; sending again
+  settles it.
 
-The state of each post is then read with `GET` on the same address (see `statuses.md`).
+To create an entry without ever replacing one, send the manifest with
+`If-None-Match: *`, which answers `412` when the key exists. The state of each post is then
+read with `GET` on the entry (see `statuses.md`).

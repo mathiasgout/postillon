@@ -10,8 +10,8 @@ the posts not sent yet.
 
 ## Documentation
 
-- `docs/submit-an-entry.md`: submit an entry from a producer.
-- `docs/api.md`: the routes of the API, their bodies and their errors.
+- `docs/submit-an-entry.md`: submit an entry from a producer, its manifest then its video.
+- `docs/api.md`: the routes of the API, their conventions, bodies, errors and conditional requests.
 - `docs/admin-page.md`: the administration pages, the posts to schedule, the publications and one entry.
 - `docs/manifest.md`: the manifest of an entry, its fields and its validation.
 - `docs/statuses.md`: the statuses of a post, when the worker steps it, and when the video goes.
@@ -19,7 +19,7 @@ the posts not sent yet.
 - `docs/instagram.md`: the Instagram platform, its accounts and their tokens, its post and its behavior.
 - `docs/tiktok.md`: the TikTok platform, scheduled by the operator, its accounts, its post and its behavior.
 - `docs/run-the-service.md`: install, migrate and run the API and the worker, under systemd.
-- `docs/configuration.md`: `postillon.toml`, the projects and their accounts.
+- `docs/configuration.md`: the configuration file, the projects and their accounts.
 - `docs/environment.md`: the environment variables, secrets included.
 - `docs/bucket.md`: what the service keeps in its S3-compatible bucket.
 - `docs/add-a-platform.md`: the post, the account settings and the client a new platform provides.

@@ -43,6 +43,6 @@ def main(argv: list[str] | None = None) -> None:
             case "worker":
                 run(settings)
             case "migrate":
-                migrate(connect(settings.database))
+                migrate(connect(settings.database), settings.videos_dir)
     except (ValidationError, ValueError, OSError) as e:
         parser.exit(2, f"postillon: {e}\n")

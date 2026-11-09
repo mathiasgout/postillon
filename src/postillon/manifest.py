@@ -22,8 +22,8 @@ from pydantic import (
 from postillon.platforms import PLATFORMS
 from postillon.platforms.base import PlatformPost
 
-# Chosen by the producer, unique within its project and never reused; `/` groups entries.
-EntryKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_-]+(/[a-z0-9_-]+)*$", max_length=200)]
+# Chosen by the producer, unique within its project and never reused; one path segment.
+EntryKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_-]+$", max_length=200)]
 
 
 class _Posts(BaseModel):

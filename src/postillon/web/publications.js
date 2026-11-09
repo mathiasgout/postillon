@@ -9,6 +9,7 @@ const board = document.getElementById("board");
 const more = document.getElementById("more");
 const projects = new Set();
 let entries = [];
+let nextToken = null;
 
 function row(entry, platforms) {
   const posts = Object.fromEntries(entry.posts.map((post) => [post.platform, post]));
@@ -75,15 +76,16 @@ function addProjects(list) {
 }
 
 async function load(append) {
-  const params = new URLSearchParams({ limit: PAGE, offset: append ? entries.length : 0 });
-  for (const name of ["project", "status"]) {
-    if (filters.elements[name].value) params.set(name, filters.elements[name].value);
-  }
+  const project = filters.elements.project.value || "-";
+  const params = new URLSearchParams({ page_size: PAGE });
+  if (filters.elements.status.value) params.set("filter", `posts.status = "${filters.elements.status.value}"`);
+  if (append && nextToken) params.set("page_token", nextToken);
   try {
-    const page = await api(`/v1/entries?${params}`);
-    addProjects(page);
-    entries = append ? entries.concat(page) : page;
-    more.hidden = page.length < PAGE;
+    const page = await api(`/v1/projects/${encodeURIComponent(project)}/entries?${params}`);
+    addProjects(page.entries);
+    entries = append ? entries.concat(page.entries) : page.entries;
+    nextToken = page.next_page_token;
+    more.hidden = !nextToken;
     render();
   } catch (e) {
     notice(`The service did not answer: ${e.message}`, true);

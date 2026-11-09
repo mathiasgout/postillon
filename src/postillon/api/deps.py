@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from postillon.settings import Settings
 from postillon.storage.videos import VideoStore
@@ -22,6 +22,12 @@ def _session(request: Request) -> Iterator[Session]:
         yield session
 
 
+def _sessions(request: Request) -> sessionmaker[Session]:
+    """For an async route, which opens its sessions in the thread pool."""
+    sessions: sessionmaker[Session] = request.app.state.sessions
+    return sessions
+
+
 def _videos(request: Request) -> VideoStore:
     videos: VideoStore = request.app.state.videos
     return videos
@@ -29,4 +35,5 @@ def _videos(request: Request) -> VideoStore:
 
 SettingsDep = Annotated[Settings, Depends(_settings)]
 SessionDep = Annotated[Session, Depends(_session)]
+SessionsDep = Annotated[sessionmaker[Session], Depends(_sessions)]
 VideosDep = Annotated[VideoStore, Depends(_videos)]

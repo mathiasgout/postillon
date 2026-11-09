@@ -42,14 +42,15 @@ handle = "@mychannel"
 1. The post stays `pending` while the operator schedules it in TikTok Studio, from the
    video, the caption and `publish_at` the To schedule page shows (see `admin-page.md`).
 2. The operator marks it scheduled, from the page or the API
-   (`POST /v1/projects/{project}/entries/{key}/posts/tiktok/scheduled`), which accepts it
+   (`POST /v1/projects/{project}/entries/{key}/posts/tiktok:mark-scheduled`), which accepts it
    before `publish_at` only. The post is `scheduled`.
 3. At `publish_at`, a `scheduled` post becomes `published`, on the operator's word: the
    service reads nothing from TikTok. A post still `pending` is `rejected`, with the error
-   `not scheduled by the operator before publish_at`.
+   `not scheduled by the operator before publish_at`, once the entry has its video (see
+   `statuses.md`).
 
-A post marked scheduled is sent: a new submission leaves it as it is, its new caption or
-publication time listed in `ignored` (see `api.md`), and the operator changes it in TikTok
+A post marked scheduled is sent: a new submission leaves it as it is, `outdated` when its
+caption or publication time changes (see `api.md`), and the operator changes it in TikTok
 Studio by hand.
 
 ## State

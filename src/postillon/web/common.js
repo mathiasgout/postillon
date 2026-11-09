@@ -11,24 +11,42 @@ export function h(tag, attrs, ...children) {
   return node;
 }
 
-// A key holds `/` between its segments, which the routes take as part of the path.
 export function entryUrl(entry) {
-  const key = entry.key.split("/").map(encodeURIComponent).join("/");
-  return `/v1/projects/${encodeURIComponent(entry.project)}/entries/${key}`;
+  return `/v1/projects/${encodeURIComponent(entry.project)}/entries/${encodeURIComponent(entry.key)}`;
+}
+
+// The service holds the video: received, and not released since every platform has it.
+export function holdsVideo(entry) {
+  return Boolean(entry.video && !entry.video.released_at);
 }
 
 export function entryPage(entry) {
   return `entry.html?${new URLSearchParams({ project: entry.project, key: entry.key })}`;
 }
 
+// An error answers application/problem+json: its `detail` says why, its `title` otherwise.
 export async function api(path, options) {
   const response = await fetch(path, options);
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = body && body.detail;
-    throw new Error(typeof detail === "string" ? detail : `${response.status} ${response.statusText}`);
+    const reason = body && (body.detail || body.title);
+    throw new Error(reason || `${response.status} ${response.statusText}`);
   }
   return body;
+}
+
+// Every item of a paged list, following its page tokens.
+export async function all(path, params, field) {
+  const items = [];
+  let token = "";
+  do {
+    const query = new URLSearchParams({ ...params, page_size: 500 });
+    if (token) query.set("page_token", token);
+    const page = await api(`${path}?${query}`);
+    items.push(...page[field]);
+    token = page.next_page_token;
+  } while (token);
+  return items;
 }
 
 // English names like the rest of the page, a 24-hour clock; the time zone stays the browser's.
@@ -96,8 +114,8 @@ export function platformName(platform) {
   return PLATFORMS[platform] || platform;
 }
 
-export function isToSchedule(entry, post) {
-  return post.manual && post.status === "pending" && new Date(entry.publish_at) > Date.now();
+export function isToSchedule(post) {
+  return post.manual && post.status === "pending" && new Date(post.publish_at) > Date.now();
 }
 
 export function notice(message, isError) {
@@ -109,10 +127,12 @@ export function notice(message, isError) {
 
 // The pending posts of manual platforms, nearest first, as [entry, post] pairs.
 export async function toSchedule() {
-  const entries = await api("/v1/entries?status=pending&limit=500");
-  return entries
-    .reverse()
-    .flatMap((entry) => entry.posts.filter((post) => isToSchedule(entry, post)).map((post) => [entry, post]));
+  const now = new Date().toISOString();
+  const entries = await all("/v1/projects/-/entries", {
+    filter: `posts.manual = true AND posts.status = "pending" AND publish_at > "${now}"`,
+    order_by: "publish_at",
+  }, "entries");
+  return entries.flatMap((entry) => entry.posts.filter(isToSchedule).map((post) => [entry, post]));
 }
 
 export function header(current) {
@@ -150,8 +170,8 @@ export function copy(textarea, button) {
   });
 }
 
-// The operator's tools for a post to schedule: its caption to copy, the video to download, and
-// the button that marks it scheduled; `onScheduled` runs once the API accepts.
+// The operator's tools for a post to schedule: its caption to copy, the video to download once
+// received, and the button that marks it scheduled; `onScheduled` runs once the API accepts.
 export function scheduleTools(entry, post, onScheduled) {
   const content = entry.manifest.posts[post.platform] || {};
   const caption = h("textarea", { class: "caption", readonly: true, "aria-label": "Caption" }, content.caption || "");
@@ -160,7 +180,7 @@ export function scheduleTools(entry, post, onScheduled) {
   scheduleButton.addEventListener("click", async () => {
     scheduleButton.disabled = true;
     try {
-      await api(`${entryUrl(entry)}/posts/${post.platform}/scheduled`, { method: "POST" });
+      await api(`${entryUrl(entry)}/posts/${post.platform}:mark-scheduled`, { method: "POST" });
       notice(`${entry.key} marked scheduled on ${platformName(post.platform)}.`);
       onScheduled();
     } catch (e) {
@@ -172,7 +192,9 @@ export function scheduleTools(entry, post, onScheduled) {
     caption,
     h("div", { class: "actions" },
       copyButton,
-      h("a", { class: "button", href: `${entryUrl(entry)}.mp4`, download: true }, "Download video"),
+      holdsVideo(entry)
+        ? h("a", { class: "button", href: `${entryUrl(entry)}/video`, download: true }, "Download video")
+        : h("span", { class: "muted" }, "Video not received yet"),
       scheduleButton,
     ),
   ];

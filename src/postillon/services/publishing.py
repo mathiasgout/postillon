@@ -99,10 +99,10 @@ class Publisher:
 
         task = Task(
             post=PLATFORMS[post.platform].post.model_validate(post.content),
-            publish_at=entry.publish_at,
+            publish_at=post.publish_at,
             state=current,
             now=now,
-            video=StoredVideo(self.videos, self.bucket, entry.project, entry.key),
+            video=StoredVideo(self.videos, self.bucket, entry.project, entry.key, entry.video_sha256),
             checkpoint=checkpoint,
             next_publish_at=_next_publish_at(session, post),
         )
@@ -117,14 +117,23 @@ class Publisher:
 
     def _release_videos(self, now: datetime) -> None:
         """Deletes both copies of each video every platform holds; the bucket copy first, so that a
-        crash in between leaves a local file rather than a forgotten object."""
+        crash in between leaves a local file rather than a forgotten object. A video received
+        meanwhile has another name and stays."""
         held = ~exists().where(Post.entry_id == Entry.id, Post.status.not_in(HOLDS_VIDEO))
         with self.sessions() as session:
-            for entry in session.scalars(select(Entry).where(Entry.video_released_at.is_(None), held)):
+            query = select(Entry).where(Entry.video_sha256.is_not(None), Entry.video_released_at.is_(None), held)
+            for entry in session.scalars(query).all():
+                sha256 = entry.video_sha256
+                if sha256 is None:
+                    continue
                 self.bucket.delete_video(entry.project, entry.key)
-                self.videos.delete(entry.project, entry.key)
+                self.videos.delete(entry.project, entry.key, sha256)
                 entry.video_released_at = now
-                session.commit()
+                try:
+                    session.commit()
+                except StaleDataError:
+                    session.rollback()
+                    log.warning("%s/%s: changed meanwhile, video released on a next pass", entry.project, entry.key)
 
 
 def _state(post: Post) -> PostState:
@@ -159,12 +168,15 @@ def _record(post: Post, new: PostState, now: datetime) -> None:
 
 
 def _is_due(post: Post, now: datetime) -> bool:
-    """Whether the platform has something to do: a `failed` post waits for its retry delay, and a
-    `scheduled` one for its publication time, to confirm it."""
+    """Whether the platform has something to do: a `pending` or `failed` post waits for the entry's
+    video, a `failed` one for its retry delay too, and a `scheduled` one for its publication time,
+    to confirm it."""
+    if post.status in (Status.PENDING, Status.FAILED) and not post.entry.holds_video:
+        return False
     if post.status == Status.FAILED:
         return now >= post.updated_at + _retry_delay(post.failures)
     if post.status == Status.SCHEDULED:
-        return now >= post.entry.publish_at
+        return now >= post.publish_at
     return True
 
 
@@ -174,14 +186,13 @@ def _retry_delay(failures: int) -> timedelta:
 
 
 def _next_publish_at(session: Session, post: Post) -> datetime | None:
-    entry = post.entry
     return session.scalar(
-        select(func.min(Entry.publish_at))
-        .join(Entry.posts)
+        select(func.min(Post.publish_at))
+        .join(Post.entry)
         .where(
-            Entry.project == entry.project,
+            Entry.project == post.entry.project,
             Post.platform == post.platform,
             Post.account == post.account,
-            Entry.publish_at > entry.publish_at,
+            Post.publish_at > post.publish_at,
         ),
     )

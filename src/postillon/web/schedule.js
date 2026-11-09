@@ -1,12 +1,16 @@
 // The posts the operator schedules by hand, nearest first.
-import { clock, entryPage, entryUrl, h, header, notice, platformName, relative, scheduleTools, shortDay, toSchedule } from "./common.js";
+import {
+  clock, entryPage, entryUrl, h, header, holdsVideo, notice, platformName, relative, scheduleTools, shortDay, toSchedule,
+} from "./common.js";
 
 const setCount = header("schedule");
 const list = document.getElementById("list");
 
 function item(entry, post) {
   return h("article", { class: "todo" },
-    h("video", { src: `${entryUrl(entry)}.mp4`, controls: true, preload: "metadata", playsinline: true }),
+    holdsVideo(entry)
+      ? h("video", { src: `${entryUrl(entry)}/video`, controls: true, preload: "metadata", playsinline: true })
+      : h("p", { class: "muted" }, "Video not received yet."),
     h("div", {},
       h("div", { class: "todo-when" },
         h("span", { class: "clock" }, shortDay(entry.publish_at)),

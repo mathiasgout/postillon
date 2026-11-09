@@ -20,7 +20,7 @@ postillon worker
 | Command | Purpose |
 | --- | --- |
 | `postillon --config <path> <command>` | Reads the configuration file at `<path>`; `postillon.toml` by default. |
-| `postillon migrate` | Brings the database schema to the latest version; run after every install or upgrade. |
+| `postillon migrate` | Brings the database schema to the latest version, and moves the held videos when a migration renames them; run after every install or upgrade, with the worker stopped. |
 | `postillon api [--host 127.0.0.1] [--port 8000]` | Serves the API (see `api.md`); `--host 0.0.0.0` serves the local network. |
 | `postillon worker` | Runs a pass every `poll_seconds` (see `statuses.md`). Once a day, it backs the database up to the bucket (see `bucket.md`) and checks the credentials that expire (see `instagram.md`). |
 

@@ -39,12 +39,26 @@ def sessions(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
 
 
-def migrate(engine: Engine) -> None:
-    """Brings the schema to the latest migration."""
-    with engine.begin() as connection:
-        config = _alembic_config()
-        config.attributes["connection"] = connection
-        command.upgrade(config, "head")
+def migrate(engine: Engine, videos_dir: Path) -> None:
+    """Brings the schema to the latest migration; a migration may move the videos held in `videos_dir`.
+    Raises ValueError, having written nothing, when the result breaks a foreign key."""
+    with engine.connect() as connection:
+        # SQLite alters a table by copying it: with foreign keys on, dropping the old copy would
+        # delete every row that references it. The pragma only takes effect outside a transaction.
+        connection.exec_driver_sql("PRAGMA foreign_keys = OFF")
+        connection.commit()
+        try:
+            with connection.begin():
+                config = _alembic_config()
+                config.attributes["connection"] = connection
+                config.attributes["videos_dir"] = videos_dir
+                command.upgrade(config, "head")
+                broken = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
+                if broken:
+                    raise ValueError(f"the migration breaks {len(broken)} foreign keys, first {tuple(broken[0])}")
+        finally:
+            connection.exec_driver_sql("PRAGMA foreign_keys = ON")
+            connection.commit()
 
 
 def check_schema(engine: Engine) -> None:

@@ -1,5 +1,5 @@
-"""The refusals of the service: each carries a stable code, and its kind decides the HTTP status the
-API answers with (see docs/api.md).
+"""The refusals of the service: each carries a stable code, the `type` of its problem response, and
+its class decides the HTTP status (see docs/api.md).
 
 Raised by the services and the storage, translated by a single handler of the API; depends on nothing.
 """
@@ -10,12 +10,16 @@ from typing import ClassVar
 
 
 class Refused(Exception):
-    """A request the service refuses; the message says why, for the client."""
+    """A request the service refuses, having written nothing; the message says why, for the client."""
 
     code: ClassVar[str]
 
 
 class NotFound(Refused):
+    pass
+
+
+class Gone(Refused):
     pass
 
 
@@ -25,6 +29,10 @@ class Invalid(Refused):
 
 class Conflict(Refused):
     """The request is valid but the current state refuses it."""
+
+
+class PreconditionFailed(Refused):
+    code = "precondition-failed"
 
 
 class ProjectNotFound(NotFound):
@@ -43,20 +51,12 @@ class VideoNotFound(NotFound):
     code = "video-not-found"
 
 
+class VideoReleased(Gone):
+    code = "video-released"
+
+
 class AccountNotConfigured(Invalid):
     code = "account-not-configured"
-
-
-class VideoMissing(Invalid):
-    code = "video-missing"
-
-
-class VideoTooLarge(Invalid):
-    code = "video-too-large"
-
-
-class VideoNotMp4(Invalid):
-    code = "video-not-mp4"
 
 
 class PlatformNotManual(Invalid):
@@ -71,14 +71,39 @@ class PublicationInFuture(Invalid):
     code = "publication-in-future"
 
 
+class InvalidFilter(Invalid):
+    code = "invalid-filter"
+
+
+class InvalidOrderBy(Invalid):
+    code = "invalid-order-by"
+
+
+class InvalidPageToken(Invalid):
+    code = "invalid-page-token"
+
+
+class VideoTooLarge(Invalid):
+    code = "video-too-large"
+
+
+class UnsupportedMediaType(Invalid):
+    code = "unsupported-media-type"
+
+
+class VideoNotMp4(UnsupportedMediaType):
+    code = "video-not-mp4"
+
+
 class EntryExists(Conflict):
     code = "entry-exists"
 
 
-class PostChanged(Conflict):
-    """Another process changed a post meanwhile; nothing is written, and the request may be sent again."""
+class ChangedMeanwhile(Conflict):
+    """Another process changed the entry or one of its posts meanwhile; nothing is written, and the
+    request may be sent again."""
 
-    code = "post-changed"
+    code = "changed-meanwhile"
 
 
 class TransitionRefused(Conflict):

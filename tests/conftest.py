@@ -30,7 +30,7 @@ def settings(tmp_path: Path) -> Settings:
 @pytest.fixture
 def engine(settings: Settings) -> Iterator[Engine]:
     engine = connect(settings.database)
-    migrate(engine)
+    migrate(engine, settings.videos_dir)
     yield engine
     engine.dispose()
 

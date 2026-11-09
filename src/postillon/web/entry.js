@@ -1,35 +1,47 @@
 // One entry: its video while the service holds it, each post with the history of its statuses, and
 // the manifest as received.
 import {
-  api, clock, entryUrl, h, header, isToSchedule, notice, platformName, relative, scheduleTools, shortDay, status,
-  toSchedule, when,
+  all, api, clock, entryUrl, h, header, holdsVideo, isToSchedule, notice, platformName, relative, scheduleTools,
+  shortDay, status, toSchedule, when,
 } from "./common.js";
 
 const setCount = header(null);
 const root = document.getElementById("entry");
 const params = new URLSearchParams(location.search);
 
-function post(entry, item) {
+function post(entry, item, events) {
   const facts = [
     ["Account", item.account],
     ["Remote id", item.remote_id],
+    ["Sent for", item.outdated ? when(item.publish_at) : ""],
     ["Failures", item.failures ? String(item.failures) : ""],
     ["Updated", when(item.updated_at)],
   ].filter(([, value]) => value);
   return h("section", { class: "post" },
     h("div", { class: "post-head" }, h("h2", {}, platformName(item.platform)), status(item.status)),
     item.error && h("p", { class: "error-text" }, item.error),
+    item.outdated && h("p", { class: "muted small" }, "Sent before the latest manifest, which its platform did not receive."),
     h("dl", {}, facts.map(([name, value]) => [h("dt", {}, name), h("dd", {}, value)])),
-    isToSchedule(entry, item) && h("div", { class: "schedule" }, scheduleTools(entry, item, load)),
+    isToSchedule(item) && h("div", { class: "schedule" }, scheduleTools(entry, item, load)),
     h("ol", { class: "history", "aria-label": "History" },
-      item.events.map((event) =>
+      events.filter((event) => event.platform === item.platform).map((event) =>
         h("li", {}, when(event.at), status(event.status), event.error && h("span", { class: "error-text" }, event.error)),
       ),
     ),
   );
 }
 
-function render(entry) {
+function video(entry) {
+  if (holdsVideo(entry)) {
+    return h("video", { src: `${entryUrl(entry)}/video`, controls: true, preload: "metadata", playsinline: true });
+  }
+  if (entry.video) {
+    return h("p", { class: "muted" }, "The service holds no video of this entry since ", when(entry.video.released_at), ".");
+  }
+  return h("p", { class: "muted" }, "No video received yet: the posts wait for it.");
+}
+
+function render(entry, events) {
   document.title = `${entry.key} - postillon`;
   root.replaceChildren(
     h("div", { class: "entry-head" },
@@ -39,13 +51,9 @@ function render(entry) {
     ),
     h("h1", { class: "entry-title" }, entry.key, h("span", { class: "muted" }, ` ${entry.project}`)),
     h("div", { class: "entry" },
-      h("div", { class: "entry-video" },
-        entry.video_released_at
-          ? h("p", { class: "muted" }, "The service holds no video of this entry since ", when(entry.video_released_at), ".")
-          : h("video", { src: `${entryUrl(entry)}.mp4`, controls: true, preload: "metadata", playsinline: true }),
-      ),
+      h("div", { class: "entry-video" }, video(entry)),
       h("div", {},
-        entry.posts.map((item) => post(entry, item)),
+        entry.posts.map((item) => post(entry, item, events)),
         h("p", { class: "muted small" }, "Submitted ", when(entry.submitted_at),
           entry.updated_at !== entry.submitted_at ? [", last updated ", when(entry.updated_at)] : "", "."),
         h("details", { class: "manifest" },
@@ -65,7 +73,9 @@ async function load() {
     return;
   }
   try {
-    render(await api(entryUrl({ project, key })));
+    const url = entryUrl({ project, key });
+    const [entry, events] = await Promise.all([api(url), all(`${url}/posts/-/events`, {}, "events")]);
+    render(entry, events);
   } catch (e) {
     notice(`${project}/${key}: ${e.message}`, true);
   }

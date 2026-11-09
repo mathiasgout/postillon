@@ -1,7 +1,7 @@
 # Manifest
 
 The manifest describes one entry: its publication time and one post per platform, with its
-account and texts. It is the `entry` part of a submission (see `api.md`).
+account and texts. It is the body of the `PUT` of an entry (see `api.md`).
 
 ```json
 {

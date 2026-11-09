@@ -1,6 +1,7 @@
 """Records an entry published outside the service, its posts already `published` (see docs/api.md).
 
-Called by the API; the worker never steps a published post, and the service holds no video of it.
+Called by the API, which commits; the worker never steps a published post, and the service holds no
+video of it.
 """
 
 from __future__ import annotations
@@ -9,7 +10,6 @@ import dataclasses
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from postillon.db.models import Entry, Post
@@ -54,12 +54,12 @@ def record(
         manifest=manifest.model_dump(mode="json", exclude_none=True),
         submitted_at=now,
         updated_at=now,
-        video_released_at=now,
         posts=[
             Post.new(
                 platform=name,
                 account=post.account,
                 content=post.model_dump(mode="json"),
+                publish_at=manifest.publish_at,
                 status=Status.PUBLISHED,
                 actor=Actor.PRODUCER,
                 now=now,
@@ -70,9 +70,4 @@ def record(
         ],
     )
     session.add(entry)
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-        raise EntryExists(f"entry {project}/{key} exists already") from None
     return entry

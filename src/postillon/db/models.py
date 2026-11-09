@@ -51,14 +51,27 @@ class Entry(Base):
     manifest: Mapped[dict[str, Any]]
     submitted_at: Mapped[datetime]
     updated_at: Mapped[datetime]
+    # The latest video received; all three are null until the first one.
+    video_received_at: Mapped[datetime | None]
+    video_size: Mapped[int | None]
+    video_sha256: Mapped[str | None] = mapped_column(String(64))
     # Set once every platform holds the video and the service deleted its copies.
     video_released_at: Mapped[datetime | None]
+    # Bumped on every write of the entry's row, as on a post.
+    version: Mapped[int] = mapped_column(default=1)
 
     posts: Mapped[list[Post]] = relationship(
         back_populates="entry",
         cascade="all, delete-orphan",
         order_by="Post.platform",
     )
+
+    __mapper_args__ = {"version_id_col": version}  # noqa: RUF012 (read by the mapper, never mutated)
+
+    @property
+    def holds_video(self) -> bool:
+        """Whether the service holds a video of the entry, received and not released."""
+        return self.video_sha256 is not None and self.video_released_at is None
 
 
 class Post(Base):
@@ -69,8 +82,10 @@ class Post(Base):
     entry_id: Mapped[int] = mapped_column(ForeignKey("entries.id", ondelete="CASCADE"))
     platform: Mapped[str] = mapped_column(String(50))
     account: Mapped[str] = mapped_column(String(100))
-    # The platform's fields of the post, as its model in `postillon.platforms` validates them.
+    # The platform's fields of the post, as its model in `postillon.platforms` validates them, and its
+    # publication time: the entry's until the post is sent, then those the platform received.
     content: Mapped[dict[str, Any]]
+    publish_at: Mapped[datetime]
     status: Mapped[Status] = mapped_column(Enum(Status, native_enum=False, length=20), index=True)
     remote_id: Mapped[str | None] = mapped_column(String(200))
     error: Mapped[str | None]
@@ -97,6 +112,7 @@ class Post(Base):
         platform: str,
         account: str,
         content: dict[str, Any],
+        publish_at: datetime,
         status: Status,
         actor: Actor,
         now: datetime,
@@ -111,6 +127,7 @@ class Post(Base):
             platform=platform,
             account=account,
             content=content,
+            publish_at=publish_at,
             status=status,
             remote_id=remote_id,
             failures=0,

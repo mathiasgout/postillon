@@ -1,5 +1,5 @@
 import dataclasses
-import io
+import hashlib
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
@@ -14,9 +14,10 @@ from postillon.platforms.base import Task
 from postillon.services import entries
 from postillon.services.publishing import Publisher
 from postillon.services.submission import submit
+from postillon.services.transaction import commit
 from postillon.settings import Settings
 from postillon.storage.videos import VideoStore
-from tests.support import BEFORE, MP4, PUBLISH_AT, FakeBucket
+from tests.support import BEFORE, MP4, PUBLISH_AT, FakeBucket, give_video, posts
 
 
 class FakePlatform:
@@ -45,23 +46,25 @@ def publisher(session_factory, settings: Settings, videos: VideoStore, bucket: F
 
 @pytest.fixture
 def send(session_factory: sessionmaker[Session], settings: Settings, videos: VideoStore):
-    def send(key: str = "day-23", publish_at: datetime = PUBLISH_AT, account: str = "main") -> None:
+    def send(key: str = "day-23", publish_at: datetime = PUBLISH_AT, account: str = "main", video: bool = True) -> None:
         m = Manifest.model_validate(
             {"publish_at": publish_at.isoformat(), "posts": {"youtube": {"account": account, "title": key}}}
         )
         with session_factory() as session:
-            submit(
-                session, settings, videos, project="my-project", key=key, manifest=m, video=io.BytesIO(MP4), now=BEFORE
-            )
+            submit(session, settings, project="my-project", key=key, manifest=m, now=BEFORE)
+            commit(session)
+        if video:
+            give_video(session_factory, videos, key)
 
     return send
 
 
+def held(videos: VideoStore, key: str = "day-23") -> bool:
+    return any((videos.root / "my-project").glob(f"{key}.*.mp4"))
+
+
 def post(session_factory: sessionmaker[Session], key: str = "day-23") -> Post:
-    with session_factory() as session:
-        entry = entries.get(session, "my-project", key)
-        assert entry is not None
-        return entry.posts[0]
+    return posts(session_factory, key)["youtube"]
 
 
 def test_pending_post_is_stepped_and_its_change_recorded(publisher, platform, send, session_factory):
@@ -162,7 +165,7 @@ def test_post_of_an_unconfigured_account_is_rejected(publisher, platform, send, 
 def test_video_is_released_once_every_platform_holds_it(publisher, send, session_factory, videos, bucket):
     send()
     publisher.run_pass(BEFORE)
-    assert not videos.exists("my-project", "day-23")
+    assert not held(videos)
     assert bucket.deleted == [("my-project", "day-23")]
     with session_factory() as session:
         entry = entries.get(session, "my-project", "day-23")
@@ -176,7 +179,7 @@ def test_video_is_kept_while_a_platform_waits(publisher, platform, send, videos,
     send()
     platform.behaviour = lambda task: task.state
     publisher.run_pass(BEFORE)
-    assert videos.exists("my-project", "day-23")
+    assert held(videos)
     assert bucket.deleted == []
 
 
@@ -204,3 +207,41 @@ def test_post_changed_by_the_api_meanwhile_is_left_for_the_next_pass(publisher, 
     publisher.run_pass(BEFORE)
     kept = post(session_factory)
     assert (kept.status, kept.content["title"]) == (Status.PENDING, "new")
+
+
+def test_post_waits_for_the_video_of_its_entry(publisher, platform, send, session_factory, videos):
+    send(video=False)
+    publisher.run_pass(BEFORE)
+    assert platform.tasks == []
+    assert post(session_factory).status == Status.PENDING
+    give_video(session_factory, videos, "day-23")
+    publisher.run_pass(BEFORE)
+    assert len(platform.tasks) == 1
+
+
+def test_a_sent_post_keeps_its_publication_time(publisher, platform, send, session_factory, settings):
+    send()
+    publisher.run_pass(BEFORE)
+    later = Manifest.model_validate(
+        {
+            "publish_at": (PUBLISH_AT + timedelta(days=1)).isoformat(),
+            "posts": {"youtube": {"account": "main", "title": "x"}},
+        }
+    )
+    with session_factory() as session:
+        submit(session, settings, project="my-project", key="day-23", manifest=later, now=BEFORE)
+        commit(session)
+    publisher.run_pass(PUBLISH_AT)
+    assert [task.publish_at for task in platform.tasks] == [PUBLISH_AT, PUBLISH_AT]
+
+
+def test_release_spares_a_video_received_meanwhile(publisher, send, session_factory, videos, bucket):
+    send()
+    new = MP4 + b"new"
+    bucket.delete_video = lambda project, key: give_video(session_factory, videos, key, new)
+    publisher.run_pass(BEFORE)
+    assert videos.path("my-project", "day-23", hashlib.sha256(new).hexdigest()).exists()
+    with session_factory() as session:
+        entry = entries.get(session, "my-project", "day-23")
+        assert entry is not None
+        assert entry.video_released_at is None

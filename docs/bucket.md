@@ -10,7 +10,9 @@ _postillon/backups/<date>.sqlite3  a daily copy of the database
 
 - **Videos**: the service copies a video to the bucket when a platform asks for a URL,
   Instagram for a Reel, and deletes it once every platform holds the video (see
-  `statuses.md`). A signed URL reads the video without credentials until it expires.
+  `statuses.md`). The object carries the video's SHA-256 in its metadata `sha256`: when the
+  entry receives another video, the next URL asked uploads it again. A signed URL reads the
+  video without credentials until it expires.
 - **Backups**: the worker uploads a consistent copy of the database on its first pass of
   each day, in UTC, and after each start; a failed backup is tried again after the next
   pass. The prefix lies outside the project alphabet, so that no project can collide

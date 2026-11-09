@@ -1,6 +1,5 @@
 import dataclasses
-import io
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
@@ -8,19 +7,19 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from postillon.db.models import Post
 from postillon.domain import PostState, Status
-from postillon.errors import PlatformNotManual, PostChanged, PostNotFound, PublishAtPassed, TransitionRefused
+from postillon.errors import ChangedMeanwhile, PlatformNotManual, PostNotFound, PublishAtPassed, TransitionRefused
 from postillon.manifest import Manifest
 from postillon.platforms.base import Task
 from postillon.platforms.tiktok.client import TikTokPlatform
-from postillon.services import entries
 from postillon.services.publishing import Publisher
 from postillon.services.scheduling import mark_scheduled
 from postillon.services.submission import submit
+from postillon.services.transaction import commit
 from postillon.settings import Settings
 from postillon.storage.videos import VideoStore
-from tests.support import BEFORE, MP4, PUBLISH_AT, FakeBucket
+from tests.support import BEFORE, PUBLISH_AT, FakeBucket, give_video, posts
 
-KEY = "season-1/day-23"
+KEY = "day-23"
 
 
 @pytest.fixture(autouse=True)
@@ -32,19 +31,21 @@ def entry(session_factory: sessionmaker[Session], settings: Settings, videos: Vi
         },
     )
     with session_factory() as session:
-        submit(session, settings, videos, project="my-project", key=KEY, manifest=m, video=io.BytesIO(MP4), now=BEFORE)
+        submit(session, settings, project="my-project", key=KEY, manifest=m, now=BEFORE)
+        commit(session)
+    give_video(session_factory, videos, KEY)
 
 
-def schedule(session_factory: sessionmaker[Session], platform: str = "tiktok", now=BEFORE, key: str = KEY) -> None:
+def schedule(
+    session_factory: sessionmaker[Session], platform: str = "tiktok", now: datetime = BEFORE, key: str = KEY
+) -> None:
     with session_factory() as session:
         mark_scheduled(session, project="my-project", key=key, platform=platform, now=now)
+        commit(session)
 
 
 def stored(session_factory: sessionmaker[Session]) -> dict[str, Post]:
-    with session_factory() as session:
-        found = entries.get(session, "my-project", KEY)
-        assert found is not None
-        return {post.platform: post for post in found.posts}
+    return posts(session_factory, KEY)
 
 
 def test_pending_post_is_scheduled_with_its_event(session_factory):
@@ -67,13 +68,13 @@ def test_refused_post(session_factory, platform: str, key: str, error: type[Exce
         schedule(session_factory, platform, key=key)
 
 
-def test_post_no_longer_pending_is_a_conflict(session_factory):
+def test_post_no_longer_pending_is_refused(session_factory):
     schedule(session_factory)
     with pytest.raises(TransitionRefused, match="is scheduled"):
         schedule(session_factory)
 
 
-def test_post_past_its_publication_time_is_a_conflict(session_factory):
+def test_post_past_its_publication_time_is_refused(session_factory):
     with pytest.raises(PublishAtPassed, match="has passed"):
         schedule(session_factory, now=PUBLISH_AT)
     assert stored(session_factory)["tiktok"].status == Status.PENDING
@@ -84,7 +85,7 @@ def test_post_changed_meanwhile_is_a_conflict(session_factory, monkeypatch: pyte
         raise StaleDataError("changed")
 
     monkeypatch.setattr(Session, "commit", stale)
-    with pytest.raises(PostChanged, match="changed meanwhile"):
+    with pytest.raises(ChangedMeanwhile, match="changed meanwhile"):
         schedule(session_factory)
 
 
@@ -97,11 +98,11 @@ def test_video_waits_for_the_operator_then_the_post_is_published(
     session_factory, settings: Settings, videos: VideoStore, bucket: FakeBucket
 ):
     platforms = {"my-project": {"youtube": SchedulingYouTube(), "tiktok": TikTokPlatform()}}
-    publisher = Publisher(session_factory, settings, platforms, videos, bucket)
+    publisher = Publisher(session_factory, settings, platforms, videos, bucket)  # type: ignore[arg-type]
     publisher.run_pass(BEFORE)
-    assert videos.exists("my-project", KEY)
+    assert any(videos.root.rglob("*.mp4"))
     schedule(session_factory)
     publisher.run_pass(BEFORE + timedelta(minutes=1))
-    assert not videos.exists("my-project", KEY)
+    assert not any((videos.root / "my-project").glob("*.mp4"))
     publisher.run_pass(PUBLISH_AT)
     assert stored(session_factory)["tiktok"].status == Status.PUBLISHED

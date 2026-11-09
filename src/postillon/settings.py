@@ -16,7 +16,8 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 from postillon.platforms import PLATFORMS
 from postillon.platforms.base import AccountName
 
-ProjectName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
+# Never `-` alone, which the API reads as every project.
+ProjectName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9-]*$")]
 
 
 class _ProjectSettings(BaseModel):

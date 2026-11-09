@@ -17,6 +17,8 @@ from postillon.settings import BucketSettings
 
 # Outside the project alphabet, so that no project prefix can collide with it.
 BACKUPS = "_postillon/backups"
+# The object's metadata that tells which video it holds, the entry's video being replaceable.
+SHA256 = "sha256"
 
 
 class Bucket:
@@ -36,12 +38,17 @@ class Bucket:
         )
         return cls(client, settings.name)
 
-    def video_url(self, project: str, key: str, path: Path, expires_seconds: int) -> str:
+    def video_url(self, project: str, key: str, path: Path, sha256: str, expires_seconds: int) -> str:
         """A signed URL that reads the entry's video without credentials, after uploading `path`
-        when the bucket does not hold it yet."""
+        when the bucket holds no copy of this video."""
         object_key = _video_key(project, key)
-        if not self._exists(object_key):
-            self.client.upload_file(str(path), self.name, object_key, ExtraArgs={"ContentType": "video/mp4"})
+        if self._sha256(object_key) != sha256:
+            self.client.upload_file(
+                str(path),
+                self.name,
+                object_key,
+                ExtraArgs={"ContentType": "video/mp4", "Metadata": {SHA256: sha256}},
+            )
         return str(
             self.client.generate_presigned_url(
                 "get_object",
@@ -58,14 +65,16 @@ class Bucket:
         """Uploads a copy of the database, one object per day."""
         self.client.upload_file(str(path), self.name, f"{BACKUPS}/{day.isoformat()}.sqlite3")
 
-    def _exists(self, object_key: str) -> bool:
+    def _sha256(self, object_key: str) -> str | None:
+        """The SHA-256 of the video the object holds; None when there is no object."""
         try:
-            self.client.head_object(Bucket=self.name, Key=object_key)
+            head = self.client.head_object(Bucket=self.name, Key=object_key)
         except ClientError as e:
             if e.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
-                return False
+                return None
             raise
-        return True
+        sha256: str | None = head.get("Metadata", {}).get(SHA256)
+        return sha256
 
 
 def _video_key(project: str, key: str) -> str:

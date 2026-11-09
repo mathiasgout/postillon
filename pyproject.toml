@@ -1,6 +1,6 @@
 [project]
 name = "postillon"
-version = "0.2.0"
+version = "0.3.0"
 description = "Publishes videos to their platforms at their time, from entries submitted to its HTTP API"
 readme = "README.md"
 license = "MIT"
