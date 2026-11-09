@@ -14,6 +14,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from alembic.util.exc import CommandError
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -41,23 +42,32 @@ def sessions(engine: Engine) -> sessionmaker[Session]:
 
 def migrate(engine: Engine) -> None:
     """Brings the schema to the latest migration; raises ValueError, having written nothing, when the
-    result breaks a foreign key."""
+    database follows another schema history or the result breaks a foreign key."""
     with engine.connect() as connection:
         # SQLite alters a table by copying it: with foreign keys on, dropping the old copy would
         # delete every row that references it. The pragma only takes effect outside a transaction.
         connection.exec_driver_sql("PRAGMA foreign_keys = OFF")
         connection.commit()
+        # The driver opens a transaction only before a data write, so that DDL would commit as it
+        # runs: the migration runs in a transaction opened here instead.
+        connection.execution_options(isolation_level="AUTOCOMMIT")
+        connection.exec_driver_sql("BEGIN")
         try:
-            with connection.begin():
-                config = _alembic_config()
-                config.attributes["connection"] = connection
-                command.upgrade(config, "head")
-                broken = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
-                if broken:
-                    raise ValueError(f"the migration breaks {len(broken)} foreign keys, first {tuple(broken[0])}")
+            config = _alembic_config()
+            config.attributes["connection"] = connection
+            command.upgrade(config, "head")
+            broken = connection.exec_driver_sql("PRAGMA foreign_key_check").all()
+            if broken:
+                raise ValueError(f"the migration breaks {len(broken)} foreign keys, first {tuple(broken[0])}")
+            connection.exec_driver_sql("COMMIT")
+        except CommandError as e:
+            connection.exec_driver_sql("ROLLBACK")
+            raise ValueError(f"cannot migrate this database: {e}") from None
+        except BaseException:
+            connection.exec_driver_sql("ROLLBACK")
+            raise
         finally:
             connection.exec_driver_sql("PRAGMA foreign_keys = ON")
-            connection.commit()
 
 
 def check_schema(engine: Engine) -> None:

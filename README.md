@@ -22,5 +22,5 @@ the posts not sent yet.
 - `docs/configuration.md`: the configuration file, the projects and their accounts.
 - `docs/environment.md`: the environment variables, secrets included.
 - `docs/bucket.md`: what the service keeps in its S3-compatible bucket.
-- `docs/add-a-platform.md`: the post, the account settings and the client a new platform provides.
+- `docs/add-a-platform.md`: the declaration, the post, the account settings and the client a new platform provides.
 - `docs/tests.md`: run the tests, the lint and the type checks.

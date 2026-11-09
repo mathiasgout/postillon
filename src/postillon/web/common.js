@@ -176,7 +176,8 @@ export function scheduleTools(entry, post, onScheduled) {
   const content = entry.manifest.posts[post.platform] || {};
   const caption = h("textarea", { class: "caption", readonly: true, "aria-label": "Caption" }, content.caption || "");
   const copyButton = h("button", { type: "button", onclick: () => copy(caption, copyButton) }, "Copy caption");
-  const scheduleButton = h("button", { type: "button", class: "primary" }, "Mark scheduled");
+  // The operator cannot schedule a video the service has not received.
+  const scheduleButton = h("button", { type: "button", class: "primary", disabled: !holdsVideo(entry) }, "Mark scheduled");
   scheduleButton.addEventListener("click", async () => {
     scheduleButton.disabled = true;
     try {

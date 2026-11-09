@@ -112,3 +112,9 @@ class TransitionRefused(Conflict):
 
 class PublishAtPassed(Conflict):
     code = "publish-at-passed"
+
+
+class VideoNotHeld(Conflict):
+    """The service holds no video of the entry, which the operator could not have scheduled."""
+
+    code = "video-not-held"

@@ -179,8 +179,13 @@ def test_video_states(client: TestClient, session_factory):
 # The posts and their history
 
 
+def put_tiktok(client: TestClient, publish_at: str = "2099-10-22T18:00:00Z") -> None:
+    client.put(URL, json=manifest(publish_at, tiktok=True))
+    put_video(client)
+
+
 def test_manual_post_is_marked_scheduled(client: TestClient):
-    client.put(URL, json=manifest(tiktok=True))
+    put_tiktok(client)
     etag = client.get(f"{URL}/posts/tiktok").headers["etag"]
     response = client.post(f"{URL}/posts/tiktok:mark-scheduled", headers={"If-Match": etag})
     assert response.status_code == 200
@@ -200,19 +205,24 @@ def test_manual_post_is_marked_scheduled(client: TestClient):
     ],
 )
 def test_refused_scheduling(client: TestClient, publish_at: str, platform: str, expected: tuple[int, str]):
-    client.put(URL, json=manifest(publish_at, tiktok=True))
+    put_tiktok(client, publish_at)
     assert problem(client.post(f"{URL}/posts/{platform}:mark-scheduled")) == expected
 
 
-def test_a_post_scheduled_twice_is_refused(client: TestClient):
+def test_a_post_without_video_cannot_be_scheduled(client: TestClient):
     client.put(URL, json=manifest(tiktok=True))
+    assert problem(client.post(f"{URL}/posts/tiktok:mark-scheduled")) == (409, "video-not-held")
+
+
+def test_a_post_scheduled_twice_is_refused(client: TestClient):
+    put_tiktok(client)
     client.post(f"{URL}/posts/tiktok:mark-scheduled")
     assert problem(client.post(f"{URL}/posts/tiktok:mark-scheduled")) == (409, "transition-refused")
     assert client.get(f"{URL}/posts/tiktok:mark-scheduled").status_code == 405
 
 
 def test_events_of_every_post_are_paged(client: TestClient):
-    client.put(URL, json=manifest(tiktok=True))
+    put_tiktok(client)
     client.post(f"{URL}/posts/tiktok:mark-scheduled")
     first = client.get(f"{URL}/posts/-/events", params={"page_size": 2}).json()
     assert [(e["platform"], e["status"]) for e in first["events"]] == [("youtube", "pending"), ("tiktok", "pending")]

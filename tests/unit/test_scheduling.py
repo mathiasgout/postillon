@@ -7,7 +7,14 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from postillon.db.models import Post
 from postillon.domain import PostState, Status
-from postillon.errors import ChangedMeanwhile, PlatformNotManual, PostNotFound, PublishAtPassed, TransitionRefused
+from postillon.errors import (
+    ChangedMeanwhile,
+    PlatformNotManual,
+    PostNotFound,
+    PublishAtPassed,
+    TransitionRefused,
+    VideoNotHeld,
+)
 from postillon.manifest import Manifest
 from postillon.platforms.base import Task
 from postillon.platforms.tiktok.client import TikTokPlatform
@@ -72,6 +79,15 @@ def test_post_no_longer_pending_is_refused(session_factory):
     schedule(session_factory)
     with pytest.raises(TransitionRefused, match="is scheduled"):
         schedule(session_factory)
+
+
+def test_post_of_an_entry_without_video_is_refused(session_factory, settings: Settings):
+    m = Manifest.model_validate({"publish_at": PUBLISH_AT.isoformat(), "posts": {"tiktok": {"account": "main"}}})
+    with session_factory() as session:
+        submit(session, settings, project="my-project", key="day-24", manifest=m, now=BEFORE)
+        commit(session)
+    with pytest.raises(VideoNotHeld):
+        schedule(session_factory, key="day-24")
 
 
 def test_post_past_its_publication_time_is_refused(session_factory):

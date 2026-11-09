@@ -116,9 +116,9 @@ class Publisher:
             return dataclasses.replace(_state(post), status=Status.FAILED, error=f"{type(e).__name__}: {e}")
 
     def _release_videos(self, now: datetime) -> None:
-        """Deletes both copies of each video every platform holds; the bucket copy first, so that a
-        crash in between leaves a local file rather than a forgotten object. A video received
-        meanwhile has another name and stays."""
+        """Records each video every platform holds as released, then deletes both its copies. The
+        record comes first: an entry the API changed meanwhile keeps its video, and a crash before
+        the deletion leaves a file nothing reads rather than a record of a file that is gone."""
         held = ~exists().where(Post.entry_id == Entry.id, Post.status.not_in(HOLDS_VIDEO))
         with self.sessions() as session:
             query = select(Entry).where(Entry.video_sha256.is_not(None), Entry.video_released_at.is_(None), held)
@@ -126,14 +126,15 @@ class Publisher:
                 sha256 = entry.video_sha256
                 if sha256 is None:
                     continue
-                self.bucket.delete_video(entry.project, entry.key)
-                self.videos.delete(entry.project, entry.key, sha256)
                 entry.video_released_at = now
                 try:
                     session.commit()
                 except StaleDataError:
                     session.rollback()
                     log.warning("%s/%s: changed meanwhile, video released on a next pass", entry.project, entry.key)
+                    continue
+                self.bucket.delete_video(entry.project, entry.key)
+                self.videos.delete(entry.project, entry.key, sha256)
 
 
 def _state(post: Post) -> PostState:

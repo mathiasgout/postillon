@@ -2,9 +2,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from alembic import command
 from alembic.autogenerate import compare_metadata
+from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
-from alembic.util.exc import CommandError
 from sqlalchemy import Engine, text
 
 from postillon.db.models import Base
@@ -31,5 +32,20 @@ def test_a_database_of_another_schema_history_is_refused(bare_engine: Engine):
         connection.execute(text("INSERT INTO alembic_version VALUES ('0001')"))
     with pytest.raises(ValueError, match="run `postillon migrate`"):
         check_schema(bare_engine)
-    with pytest.raises(CommandError, match="0001"):
+    with pytest.raises(ValueError, match=r"cannot migrate this database.*0001"):
         migrate(bare_engine)
+
+
+def test_a_failed_migration_leaves_no_table(bare_engine: Engine, monkeypatch: pytest.MonkeyPatch):
+    upgrade = command.upgrade
+
+    def interrupted(config: Config, revision: str) -> None:
+        upgrade(config, revision)
+        raise RuntimeError("interrupted")
+
+    monkeypatch.setattr(command, "upgrade", interrupted)
+    with pytest.raises(RuntimeError, match="interrupted"):
+        migrate(bare_engine)
+    with bare_engine.connect() as connection:
+        assert connection.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'")).all() == []
+        assert connection.execute(text("PRAGMA foreign_keys")).scalar_one() == 1

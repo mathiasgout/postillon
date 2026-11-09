@@ -4,10 +4,10 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import event, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from postillon.db.models import Post
+from postillon.db.models import Entry, Post
 from postillon.domain import PostState, Status
 from postillon.manifest import Manifest
 from postillon.platforms.base import Task
@@ -245,3 +245,29 @@ def test_release_spares_a_video_received_meanwhile(publisher, send, session_fact
         entry = entries.get(session, "my-project", "day-23")
         assert entry is not None
         assert entry.video_released_at is None
+
+
+def test_release_is_left_for_later_when_the_entry_changes_meanwhile(
+    publisher, send, session_factory, videos, bucket, engine
+):
+    send()
+    released: list[bool] = []
+
+    def concurrent(session: Session) -> None:
+        if not released and any(isinstance(row, Entry) and row.video_released_at for row in session.dirty):
+            released.append(True)
+            with engine.begin() as other:
+                other.execute(update(Entry).values(version=Entry.version + 1))
+
+    event.listen(session_factory, "before_commit", concurrent)
+    publisher.run_pass(BEFORE)
+    assert released
+    assert held(videos)
+    assert bucket.deleted == []
+    with session_factory() as session:
+        entry = entries.get(session, "my-project", "day-23")
+        assert entry is not None
+        assert entry.video_released_at is None
+    event.remove(session_factory, "before_commit", concurrent)
+    publisher.run_pass(BEFORE)
+    assert not held(videos)

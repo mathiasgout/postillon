@@ -71,7 +71,7 @@ class InstagramPlatform:
     def _step(self, task: Task) -> PostState:
         post = task.post
         if not isinstance(post, InstagramPost):
-            raise TypeError(f"expected a InstagramPost, got {type(post).__name__}")
+            raise TypeError(f"expected an InstagramPost, got {type(post).__name__}")
         state = task.state
         token = read_secret(self._accounts[post.account].access_token_env)
         user_id = self._user_id(post.account, token)

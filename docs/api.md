@@ -74,6 +74,7 @@ such as an unknown route, has the type `about:blank`.
 | `entry-exists` | 409 | A record names an entry that exists. |
 | `transition-refused` | 409 | The post's status does not allow the change. |
 | `publish-at-passed` | 409 | The post's publication time has passed. |
+| `video-not-held` | 409 | The service holds no video of the entry, so the operator cannot have scheduled it. |
 | `changed-meanwhile` | 409 | Another request or the worker changed the entry meanwhile; nothing is written, and sending the request again settles it. |
 | `precondition-failed` | 412 | `If-Match` or `If-None-Match` does not hold (see below). |
 
@@ -154,7 +155,8 @@ the same as in its entry.
 
 `POST /v1/projects/{project}/entries/{key}/posts/{platform}:mark-scheduled`, without a
 body, records that the operator scheduled a `pending` post on its manual platform (see
-`tiktok.md`), which publishes it at `publish_at`. It answers `200` with the post, now
+`tiktok.md`), which publishes it at `publish_at`. The service must hold the entry's video,
+which the operator downloads to schedule it. It answers `200` with the post, now
 `scheduled`.
 
 ## Read the history of a post

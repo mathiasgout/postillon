@@ -54,6 +54,8 @@ WILDCARD = "-"
 PAGE_SIZE = 100
 MAX_PAGE_SIZE = 500
 BINARY = {"type": "string", "format": "binary"}
+# The body is written and hashed in the thread pool, a mebibyte at a time, off the event loop.
+WRITE_BYTES = 1024 * 1024
 
 
 class Segment(Convertor[str]):
@@ -224,9 +226,14 @@ async def put_video(
         raise VideoTooLarge(f"video is over {videos.max_bytes} bytes")
     await run_in_threadpool(_check_video, sessions, project, key, if_match, if_none_match)
     with videos.upload() as upload:
+        buffer = bytearray()
         async for chunk in request.stream():
-            upload.write(chunk)
-        staged = upload.finish()
+            buffer += chunk
+            if len(buffer) >= WRITE_BYTES:
+                await run_in_threadpool(upload.write, bytes(buffer))
+                buffer.clear()
+        await run_in_threadpool(upload.write, bytes(buffer))
+        staged = await run_in_threadpool(upload.finish)
     try:
         created = await run_in_threadpool(_store_video, sessions, videos, project, key, staged, if_match, if_none_match)
     finally:

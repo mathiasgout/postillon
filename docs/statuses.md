@@ -24,7 +24,7 @@ sent with, and the API says they are `outdated` when the manifest no longer matc
 | Actor | Change |
 | --- | --- |
 | Producer | Creates a post `pending` by a submission, or `published` by a record; makes a `rejected` post `pending` by submitting the entry again. |
-| Operator | Makes a `pending` post of a manual platform `scheduled`, before `publish_at`. |
+| Operator | Makes a `pending` post of a manual platform `scheduled`, before `publish_at`, once the entry has its video. |
 | Worker | Gives a `pending`, `in_progress`, `failed` or `scheduled` post the status its platform returns. |
 
 The service refuses any other change (see `api.md`).

@@ -22,7 +22,8 @@ first. Each one shows:
 - `publish_at` and the time left until it;
 - the caption, with a button that copies it;
 - **Mark scheduled**, which marks the post scheduled through the API once the operator has
-  scheduled it on its platform; the API's refusal, if any, is shown above the list.
+  scheduled it on its platform, and stays disabled until the entry has its video; the API's
+  refusal, if any, is shown above the list.
 
 ## Publications
 
