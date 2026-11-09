@@ -21,12 +21,19 @@ Only the routes under `/v1` form the contract.
 
 ## Conventions
 
+The contract follows HTTP (RFC 9110, RFC 9457 for errors), and Google's API Improvement
+Proposals where HTTP leaves a choice: naming, lists, custom methods and statuses (AIP-122,
+132, 136, 158, 159, 160 and 216). A new route follows the conventions below, which derive
+from them.
+
 - **Resources.** An entry belongs to a project, and has a video and one post per platform,
   each post a history of statuses. `GET` reads a resource, `PUT` creates or replaces one
   at the name the client chooses, and a list is a `GET` on its collection.
 - **Statuses are the service's.** No request writes a status: a change asked by a client is
   a custom method, `POST {resource}:{verb}`, which the service accepts only when the
-  status allows it (see `statuses.md`). A custom method acts on a resource that exists.
+  status allows it (see `statuses.md`). A custom method acts on a resource that exists; a
+  resource created in a given status is created by a custom method on its collection, as
+  `entries:record` is.
 - **A write answers the resource it acted on**, as a read of it does.
 - **Names.** In a path, everything is lowercase and a name of several words is joined by
   `-`; in JSON and in query parameters, by `_`. Times are RFC 3339, answered in UTC.

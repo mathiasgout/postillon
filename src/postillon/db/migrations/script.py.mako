@@ -1,3 +1,5 @@
+## A migration imports nothing from postillon, whose models change after it, and writes only to
+## the database: `migrate` runs it in one transaction, which a file moved on disk would escape.
 """${message}
 
 Revision ID: ${up_revision}
