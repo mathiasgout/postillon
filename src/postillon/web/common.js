@@ -182,10 +182,10 @@ export function scheduleTools(entry, post, onScheduled) {
     scheduleButton.disabled = true;
     try {
       await api(`${entryUrl(entry)}/posts/${post.platform}:mark-scheduled`, { method: "POST" });
-      notice(`${entry.key} marked scheduled on ${platformName(post.platform)}.`);
+      notice(`${entry.project}/${entry.key} marked scheduled on ${platformName(post.platform)}.`);
       onScheduled();
     } catch (e) {
-      notice(`${entry.key} on ${platformName(post.platform)}: ${e.message}`, true);
+      notice(`${entry.project}/${entry.key} on ${platformName(post.platform)}: ${e.message}`, true);
       scheduleButton.disabled = false;
     }
   });

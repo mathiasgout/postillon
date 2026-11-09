@@ -38,7 +38,10 @@ function video(entry) {
   if (entry.video) {
     return h("p", { class: "muted" }, "The service holds no video of this entry since ", when(entry.video.released_at), ".");
   }
-  return h("p", { class: "muted" }, "No video received yet: the posts wait for it.");
+  if (entry.posts.some((item) => item.status === "pending")) {
+    return h("p", { class: "muted" }, "No video received yet: the pending posts wait for it.");
+  }
+  return h("p", { class: "muted" }, "The service never received a video of this entry.");
 }
 
 function render(entry, events) {
