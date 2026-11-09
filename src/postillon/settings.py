@@ -7,31 +7,40 @@ Read once at start by each process; an invalid configuration stops it before any
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretStr, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretStr, StringConstraints, create_model
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
+from postillon.platforms import PLATFORMS
 from postillon.platforms.base import AccountName
-from postillon.platforms.instagram.settings import InstagramAccount
-from postillon.platforms.tiktok.settings import TikTokAccount
-from postillon.platforms.youtube.settings import YouTubeAccount
 
 ProjectName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
 CONFIG_FILE = Path("postillon.toml")
 
 
-class ProjectSettings(BaseModel):
+class _ProjectSettings(BaseModel):
     """The accounts of one project, by platform and account name."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    youtube: dict[AccountName, YouTubeAccount] = {}
-    instagram: dict[AccountName, InstagramAccount] = {}
-    tiktok: dict[AccountName, TikTokAccount] = {}
+    def account_settings(self, platform: str) -> dict[str, BaseModel]:
+        return dict(getattr(self, platform, {}))
 
     def accounts(self, platform: str) -> set[str]:
-        return set(getattr(self, platform, {}))
+        return set(self.account_settings(platform))
+
+
+# A field per platform of the registry; type checkers see its base, which declares every method.
+if TYPE_CHECKING:
+    ProjectSettings = _ProjectSettings
+else:
+    ProjectSettings = create_model(
+        "ProjectSettings",
+        __base__=_ProjectSettings,
+        __doc__=_ProjectSettings.__doc__,
+        **{name: (dict[AccountName, spec.account], {}) for name, spec in PLATFORMS.items()},
+    )
 
 
 class BucketSettings(BaseModel):

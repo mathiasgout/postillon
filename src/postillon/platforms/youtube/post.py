@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, ClassVar
+from typing import Annotated
 
 from pydantic import StringConstraints, field_validator
 
@@ -15,8 +15,6 @@ FORBIDDEN = ("<", ">")
 
 
 class YouTubePost(PlatformPost):
-    name: ClassVar[str] = "youtube"
-
     title: Annotated[str, StringConstraints(min_length=1, max_length=TITLE_CHARS)]
     description: str = ""
     category_id: Annotated[str, StringConstraints(pattern=r"^[0-9]+$")] = "22"

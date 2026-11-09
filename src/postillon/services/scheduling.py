@@ -14,7 +14,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from postillon.db.models import Entry, Event, Post
 from postillon.domain import Status
-from postillon.platforms import POSTS
+from postillon.platforms import PLATFORMS
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def mark_scheduled(session: Session, *, project: str, key: str, platform: str, n
     )
     if post is None:
         raise PostNotFound(f"entry {project}/{key} has no {platform} post")
-    if not POSTS[platform].manual:
+    if not PLATFORMS[platform].manual:
         raise NotManual(f"{platform} is published by the service, not by the operator")
     if post.status != Status.PENDING:
         raise SchedulingConflict(f"the {platform} post is {post.status}, not pending")

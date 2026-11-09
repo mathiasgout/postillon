@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Annotated, ClassVar
+from typing import Annotated
 
 from pydantic import Field, StringConstraints, field_validator
 
@@ -18,8 +18,6 @@ MENTION = re.compile(r"(?<!\w)@[\w.]+")
 
 
 class InstagramPost(PlatformPost):
-    name: ClassVar[str] = "instagram"
-
     caption: Annotated[str, StringConstraints(max_length=CAPTION_CHARS)] = ""
     share_to_feed: bool = True
     # The frame used as cover, in milliseconds from the start.

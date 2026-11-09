@@ -1,37 +1,50 @@
 """The manifest of an entry: its publication time and its posts, the JSON a producer submits
 (see docs/manifest.md).
 
-Only module that reads a manifest; adding a platform adds a field to `Posts`.
+Only module that reads a manifest; `Posts` takes its fields from the platform registry.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    StringConstraints,
+    create_model,
+    field_validator,
+    model_validator,
+)
 
-from postillon.platforms import POSTS
+from postillon.platforms import PLATFORMS
 from postillon.platforms.base import PlatformPost
-from postillon.platforms.instagram import InstagramPost
-from postillon.platforms.tiktok import TikTokPost
-from postillon.platforms.youtube import YouTubePost
 
 # Chosen by the producer, unique within its project and never reused; `/` groups entries.
 EntryKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_-]+(/[a-z0-9_-]+)*$", max_length=200)]
 
 
-class Posts(BaseModel):
+class _Posts(BaseModel):
     """One post per platform the entry is published on."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    youtube: YouTubePost | None = None
-    instagram: InstagramPost | None = None
-    tiktok: TikTokPost | None = None
-
     def by_platform(self) -> dict[str, PlatformPost]:
-        return {name: post for name in POSTS if (post := getattr(self, name)) is not None}
+        return {name: post for name in PLATFORMS if (post := getattr(self, name)) is not None}
+
+
+# A field per platform of the registry; type checkers see its base, which declares every method.
+if TYPE_CHECKING:
+    Posts = _Posts
+else:
+    Posts = create_model(
+        "Posts",
+        __base__=_Posts,
+        __doc__=_Posts.__doc__,
+        **{name: (spec.post | None, None) for name, spec in PLATFORMS.items()},
+    )
 
 
 class Manifest(BaseModel):

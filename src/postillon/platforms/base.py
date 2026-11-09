@@ -1,5 +1,5 @@
-"""The contract between the service and a platform: the post a manifest carries, the task the
-publisher hands over and the platform that performs it (see docs/add-a-platform.md).
+"""The contract between the service and a platform: its declaration, the post a manifest carries,
+the task the publisher hands over and the platform that performs it (see docs/add-a-platform.md).
 
 Imports no platform SDK, so that the API validates a post without loading its platform.
 """
@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, ClassVar, Protocol, runtime_checkable
+from typing import Annotated, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
@@ -25,10 +25,6 @@ class PlatformPost(BaseModel):
     """The publication of an entry on one platform, as the manifest carries it."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
-
-    name: ClassVar[str]
-    # Scheduled by the operator, who tells the API once the platform holds the video.
-    manual: ClassVar[bool] = False
 
     account: AccountName
 
@@ -70,6 +66,22 @@ class ChecksCredentials(Protocol):
     def check_credentials(self, now: datetime) -> None:
         """Warns before the credentials expire; logs a failure instead of raising."""
         ...
+
+
+@dataclasses.dataclass(frozen=True)
+class PlatformSpec[A: BaseModel]:
+    """A platform as its package declares it; the manifest, the configuration and the worker derive
+    their fields and clients from `postillon.platforms.PLATFORMS`."""
+
+    name: str
+    post: type[PlatformPost]
+    account: type[A]
+    # Imports the client only when called, so that the API never loads the platform's SDK.
+    client: Callable[[Mapping[str, A]], Platform]
+    # Scheduled by the operator, who tells the API once the platform holds the video.
+    manual: bool = False
+    # The extra of pyproject.toml holding the client's SDK; None when the client needs none.
+    extra: str | None = None
 
 
 def read_secret(variable: str) -> str:

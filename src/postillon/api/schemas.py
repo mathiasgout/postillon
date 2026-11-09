@@ -10,7 +10,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, StringConstraints, co
 
 from postillon.domain import Status
 from postillon.manifest import Manifest
-from postillon.platforms import POSTS
+from postillon.platforms import PLATFORMS
 
 
 class PublicationIn(BaseModel):
@@ -58,7 +58,7 @@ class PostOut(BaseModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def manual(self) -> bool:
-        return POSTS[self.platform].manual
+        return PLATFORMS[self.platform].manual
 
 
 class EntryOut(BaseModel):

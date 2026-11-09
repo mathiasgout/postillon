@@ -18,7 +18,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from postillon.db.models import Entry, Event, Post
 from postillon.domain import HOLDS_VIDEO, PostState, Status
-from postillon.platforms import POSTS
+from postillon.platforms import PLATFORMS
 from postillon.platforms.base import Platform, Task
 from postillon.settings import Settings
 from postillon.storage.bucket import Bucket
@@ -100,7 +100,7 @@ class Publisher:
             session.commit()
 
         task = Task(
-            post=POSTS[post.platform].model_validate(post.content),
+            post=PLATFORMS[post.platform].post.model_validate(post.content),
             publish_at=entry.publish_at,
             state=current,
             now=now,

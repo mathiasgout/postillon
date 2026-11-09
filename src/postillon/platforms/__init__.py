@@ -1,13 +1,16 @@
-"""The platforms postillon knows, by the name their post carries in a manifest.
+"""The platforms postillon knows, each declared once by its package (see docs/add-a-platform.md).
 
-Loads the posts only, without any platform SDK; `loader` builds the clients.
+Loads the posts and the account settings only, without any platform SDK; `loader` builds the clients.
 """
 
 from __future__ import annotations
 
-from postillon.platforms.base import PlatformPost
-from postillon.platforms.instagram import InstagramPost
-from postillon.platforms.tiktok import TikTokPost
-from postillon.platforms.youtube import YouTubePost
+from typing import Any
 
-POSTS: dict[str, type[PlatformPost]] = {post.name: post for post in (YouTubePost, InstagramPost, TikTokPost)}
+from postillon.platforms import instagram, tiktok, youtube
+from postillon.platforms.base import PlatformSpec
+
+# In the order an entry lists its posts.
+PLATFORMS: dict[str, PlatformSpec[Any]] = {
+    spec.name: spec for spec in (youtube.PLATFORM, instagram.PLATFORM, tiktok.PLATFORM)
+}

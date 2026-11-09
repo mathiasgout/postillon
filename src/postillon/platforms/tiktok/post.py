@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
-
 from pydantic import field_validator
 
 from postillon.platforms.base import PlatformPost
@@ -14,9 +12,6 @@ CAPTION_UTF16_UNITS = 2200
 
 
 class TikTokPost(PlatformPost):
-    name: ClassVar[str] = "tiktok"
-    manual: ClassVar[bool] = True
-
     caption: str = ""
 
     @field_validator("caption")

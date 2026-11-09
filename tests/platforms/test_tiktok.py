@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from postillon.domain import PostState, Status
 from postillon.platforms.base import Task
-from postillon.platforms.tiktok import TikTokAccount, TikTokPost
+from postillon.platforms.tiktok import PLATFORM, TikTokAccount, TikTokPost
 from postillon.platforms.tiktok.client import NOT_SCHEDULED, TikTokPlatform
 from tests.support import BEFORE, PUBLISH_AT
 
@@ -47,7 +47,7 @@ def test_post_not_scheduled_at_its_publication_time_is_rejected():
 
 
 def test_post_is_manual():
-    assert TikTokPost.manual
+    assert PLATFORM.manual
 
 
 def test_caption_counts_utf16_units():

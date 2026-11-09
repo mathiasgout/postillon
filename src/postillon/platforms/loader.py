@@ -3,6 +3,7 @@ is configured, so that a missing extra matters only where it is used."""
 
 from __future__ import annotations
 
+from postillon.platforms import PLATFORMS
 from postillon.platforms.base import Platform
 from postillon.settings import ProjectSettings
 
@@ -11,18 +12,15 @@ def load_platforms(project: ProjectSettings) -> dict[str, Platform]:
     """The client of each platform with an account in the project; raises ValueError when a
     platform's extra or an account's secret is missing."""
     platforms: dict[str, Platform] = {}
-    if project.youtube:
+    for name, spec in PLATFORMS.items():
+        accounts = project.account_settings(name)
+        if not accounts:
+            continue
         try:
-            from postillon.platforms.youtube.client import YouTubePlatform  # noqa: PLC0415 (optional extra)
+            platforms[name] = spec.client(accounts)
         except ModuleNotFoundError as e:
-            raise ValueError(f"youtube: client unavailable ({e.name} missing), install postillon[youtube]") from None
-        platforms["youtube"] = YouTubePlatform(project.youtube)
-    if project.instagram:
-        from postillon.platforms.instagram.client import InstagramPlatform  # noqa: PLC0415 (loaded with its peer)
-
-        platforms["instagram"] = InstagramPlatform(project.instagram)
-    if project.tiktok:
-        from postillon.platforms.tiktok.client import TikTokPlatform  # noqa: PLC0415 (loaded with its peers)
-
-        platforms["tiktok"] = TikTokPlatform()
+            if spec.extra is None:
+                raise
+            missing = f"{name}: client unavailable ({e.name} missing)"
+            raise ValueError(f"{missing}, install postillon[{spec.extra}]") from None
     return platforms

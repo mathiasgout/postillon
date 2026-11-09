@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from postillon.manifest import Manifest, Posts
-from postillon.platforms import POSTS
+from postillon.platforms import PLATFORMS
 from postillon.platforms.instagram import InstagramPost
 from postillon.platforms.youtube import YouTubePost
 
@@ -49,7 +49,7 @@ def test_invalid_manifests(raw: str, message: str):
 
 
 def test_posts_and_registry_name_the_same_platforms():
-    assert set(Posts.model_fields) == set(POSTS)
+    assert set(Posts.model_fields) == set(PLATFORMS)
 
 
 @pytest.mark.parametrize(
