@@ -60,7 +60,8 @@ class YouTubePlatform:
 
     def _step(self, task: Task) -> PostState:
         post = task.post
-        assert isinstance(post, YouTubePost)
+        if not isinstance(post, YouTubePost):
+            raise TypeError(f"expected a YouTubePost, got {type(post).__name__}")
         youtube = self._client(post.account)
         if task.state.remote_id is not None:
             return _confirm(youtube, task.state)

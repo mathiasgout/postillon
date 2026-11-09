@@ -1,9 +1,10 @@
 # Configuration
 
-The service reads `postillon.toml` in its working directory. A key can be overridden by an
-environment variable named `POSTILLON_` then the key, nested keys joined by `__`
+The service reads the TOML file `--config` names, `postillon.toml` of the working
+directory by default (see `run-the-service.md`). A key can be overridden by an environment
+variable named `POSTILLON_` then the key, nested keys joined by `__`
 (`POSTILLON_POLL_SECONDS`, `POSTILLON_BUCKET__NAME`). Secrets never go in the file (see
-`environment.md`).
+`environment.md`). An unknown key refuses the start.
 
 ```toml
 data_dir = "data"
@@ -29,7 +30,7 @@ handle = "@mychannel"
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `data_dir` | `data` | Holds the database `postillon.db` and the videos waiting for their platforms (`videos/`). |
+| `data_dir` | `data` | Holds the database `postillon.db` and the videos waiting for their platforms (`videos/`); a relative path starts from the folder of the configuration file. |
 | `poll_seconds` | `60` | Interval between two passes of the worker. |
 | `max_video_bytes` | 1 GiB | Largest video the API accepts. |
 | `bucket.endpoint`, `bucket.access_key_id`, `bucket.name` | | The S3-compatible bucket (see `bucket.md`); its secret key comes from the environment. |

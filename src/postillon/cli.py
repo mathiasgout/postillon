@@ -18,6 +18,12 @@ from postillon.worker.main import run
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="postillon")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("postillon.toml"),
+        help="the configuration file, whose folder holds `.env` and a relative `data_dir`",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     api = commands.add_parser("api", help="serve the HTTP API")
     api.add_argument("--host", default="127.0.0.1", help="address to listen on, 0.0.0.0 for the local network")
@@ -27,10 +33,10 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    # The secrets live in `.env` next to `postillon.toml`, never in the file itself.
-    load_dotenv(Path(".env"))
+    # The secrets live in `.env` next to the configuration file, never in the file itself.
+    load_dotenv(args.config.parent / ".env")
     try:
-        settings = Settings()
+        settings = Settings.load(args.config)
         match args.command:
             case "api":
                 uvicorn.run(create_app(settings), host=args.host, port=args.port, log_config=None)
@@ -38,5 +44,5 @@ def main(argv: list[str] | None = None) -> None:
                 run(settings)
             case "migrate":
                 migrate(connect(settings.database))
-    except (ValidationError, ValueError) as e:
+    except (ValidationError, ValueError, OSError) as e:
         parser.exit(2, f"postillon: {e}\n")

@@ -1,8 +1,10 @@
 # Run the service
 
 The service is two processes sharing one SQLite database: `postillon api` serves the API,
-`postillon worker` publishes. Both run from a working directory that holds `postillon.toml`
-(see `configuration.md`), the `.env` of the secrets (see `environment.md`) and `data_dir`.
+`postillon worker` publishes. Both read the configuration file that `--config` names,
+`postillon.toml` of the working directory by default (see `configuration.md`); its folder
+holds the `.env` of the secrets (see `environment.md`) and, unless it is absolute,
+`data_dir`.
 
 postillon is not published on PyPI: it installs from GitHub, pinned on a tag or a commit
 (`<ref>`).
@@ -17,6 +19,7 @@ postillon worker
 
 | Command | Purpose |
 | --- | --- |
+| `postillon --config <path> <command>` | Reads the configuration file at `<path>`; `postillon.toml` by default. |
 | `postillon migrate` | Brings the database schema to the latest version; run after every install or upgrade. |
 | `postillon api [--host 127.0.0.1] [--port 8000]` | Serves the API (see `api.md`); `--host 0.0.0.0` serves the local network. |
 | `postillon worker` | Runs a pass every `poll_seconds` (see `statuses.md`). Once a day, it backs the database up to the bucket (see `bucket.md`) and checks the credentials that expire (see `instagram.md`). |
@@ -40,9 +43,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/opt/postillon
-ExecStartPre=/home/postillon/.local/bin/postillon migrate
-ExecStart=/home/postillon/.local/bin/postillon api --host 0.0.0.0
+ExecStartPre=/home/postillon/.local/bin/postillon --config /opt/postillon/postillon.toml migrate
+ExecStart=/home/postillon/.local/bin/postillon --config /opt/postillon/postillon.toml api --host 0.0.0.0
 Restart=on-failure
 User=postillon
 
@@ -58,8 +60,7 @@ After=postillon-api.service
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/opt/postillon
-ExecStart=/home/postillon/.local/bin/postillon worker
+ExecStart=/home/postillon/.local/bin/postillon --config /opt/postillon/postillon.toml worker
 Restart=on-failure
 # A pass may be uploading a video: leave it time to end before SIGKILL.
 TimeoutStopSec=600

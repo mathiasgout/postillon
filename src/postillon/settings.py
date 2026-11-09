@@ -1,4 +1,4 @@
-"""The service configuration: `postillon.toml` for the projects and their accounts, environment
+"""The service configuration: a TOML file for the projects and their accounts, environment
 variables for the secrets (see docs/configuration.md).
 
 Read once at start by each process; an invalid configuration stops it before anything runs.
@@ -6,17 +6,17 @@ Read once at start by each process; an invalid configuration stops it before any
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretStr, StringConstraints, create_model
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from postillon.platforms import PLATFORMS
 from postillon.platforms.base import AccountName
 
 ProjectName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
-CONFIG_FILE = Path("postillon.toml")
 
 
 class _ProjectSettings(BaseModel):
@@ -56,10 +56,9 @@ class BucketSettings(BaseModel):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        toml_file=CONFIG_FILE,
         env_prefix="POSTILLON_",
         env_nested_delimiter="__",
-        extra="ignore",
+        extra="forbid",
         frozen=True,
     )
 
@@ -70,6 +69,16 @@ class Settings(BaseSettings):
     max_video_bytes: PositiveInt = 1024**3
     bucket: BucketSettings
     projects: dict[ProjectName, ProjectSettings] = Field(min_length=1)
+
+    @classmethod
+    def load(cls, path: Path) -> Settings:
+        """The settings of the file at `path`, a relative `data_dir` taken from its folder; raises
+        OSError when the file cannot be read, ValueError when it is not TOML, and ValidationError."""
+        with path.open("rb") as f:
+            settings = cls(**tomllib.load(f))
+        if settings.data_dir.is_absolute():
+            return settings
+        return settings.model_copy(update={"data_dir": path.parent / settings.data_dir})
 
     @property
     def database(self) -> Path:
@@ -88,5 +97,6 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        # The environment overrides the file, so that secrets never have to be written in it.
-        return init_settings, env_settings, TomlConfigSettingsSource(settings_cls)
+        # The environment overrides the values given, those of the file included, so that secrets
+        # never have to be written in it.
+        return env_settings, init_settings
