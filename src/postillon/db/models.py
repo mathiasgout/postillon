@@ -1,7 +1,8 @@
 """The tables of the service: the submitted entries, their posts and the history of the posts'
 statuses (see docs/statuses.md).
 
-Changing a model takes a migration in `postillon/db/migrations/versions`.
+Changing a model takes a migration in `postillon/db/migrations/versions`, which imports nothing
+from here: a migration describes the schema at its revision and never changes afterwards.
 """
 
 from __future__ import annotations

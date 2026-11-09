@@ -7,8 +7,6 @@ Revises:
 import sqlalchemy as sa
 from alembic import op
 
-from postillon.db.models import UTCDateTime
-
 revision = "0001"
 down_revision = None
 branch_labels = None
@@ -33,11 +31,11 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("project", sa.String(100), nullable=False),
         sa.Column("key", sa.String(200), nullable=False),
-        sa.Column("publish_at", UTCDateTime(), nullable=False),
+        sa.Column("publish_at", sa.DateTime(), nullable=False),
         sa.Column("manifest", sa.JSON(), nullable=False),
-        sa.Column("submitted_at", UTCDateTime(), nullable=False),
-        sa.Column("updated_at", UTCDateTime(), nullable=False),
-        sa.Column("video_released_at", UTCDateTime(), nullable=True),
+        sa.Column("submitted_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.Column("video_released_at", sa.DateTime(), nullable=True),
         sa.UniqueConstraint("project", "key"),
     )
     op.create_index("ix_entries_publish_at", "entries", ["publish_at"])
@@ -53,7 +51,7 @@ def upgrade() -> None:
         sa.Column("error", sa.String(), nullable=True),
         sa.Column("failures", sa.Integer(), nullable=False),
         sa.Column("extra", sa.JSON(), nullable=False),
-        sa.Column("updated_at", UTCDateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
         sa.UniqueConstraint("entry_id", "platform"),
     )
@@ -64,7 +62,7 @@ def upgrade() -> None:
         sa.Column("post_id", sa.Integer(), sa.ForeignKey("posts.id", ondelete="CASCADE"), nullable=False),
         sa.Column("status", STATUS, nullable=False),
         sa.Column("error", sa.String(), nullable=True),
-        sa.Column("at", UTCDateTime(), nullable=False),
+        sa.Column("at", sa.DateTime(), nullable=False),
     )
     op.create_index("ix_events_post_id", "events", ["post_id"])
 
