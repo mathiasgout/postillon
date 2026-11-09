@@ -1,13 +1,15 @@
-"""Entries, posts and their events.
+"""Entries, their video, their posts and the posts' events.
 
-Revision ID: 0001
+Revision ID: initial
 Revises:
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0001"
+# Neither "0001" nor an id it prefixes, which Alembic would resolve to this one: the revision
+# "0001" names a schema this one does not follow, and `migrate` refuses such a database.
+revision = "initial"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -35,7 +37,11 @@ def upgrade() -> None:
         sa.Column("manifest", sa.JSON(), nullable=False),
         sa.Column("submitted_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.Column("video_received_at", sa.DateTime(), nullable=True),
+        sa.Column("video_size", sa.Integer(), nullable=True),
+        sa.Column("video_sha256", sa.String(64), nullable=True),
         sa.Column("video_released_at", sa.DateTime(), nullable=True),
+        sa.Column("version", sa.Integer(), nullable=False),
         sa.UniqueConstraint("project", "key"),
     )
     op.create_index("ix_entries_publish_at", "entries", ["publish_at"])
@@ -46,6 +52,7 @@ def upgrade() -> None:
         sa.Column("platform", sa.String(50), nullable=False),
         sa.Column("account", sa.String(100), nullable=False),
         sa.Column("content", sa.JSON(), nullable=False),
+        sa.Column("publish_at", sa.DateTime(), nullable=False),
         sa.Column("status", STATUS, nullable=False),
         sa.Column("remote_id", sa.String(200), nullable=True),
         sa.Column("error", sa.String(), nullable=True),
