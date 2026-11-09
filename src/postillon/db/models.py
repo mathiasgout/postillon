@@ -13,7 +13,8 @@ from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, TypeDecorator, 
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from postillon.domain import Status
+from postillon.domain import Actor, Status, allowed
+from postillon.errors import TransitionRefused
 
 
 class UTCDateTime(TypeDecorator[datetime]):
@@ -87,6 +88,48 @@ class Post(Base):
     )
 
     __mapper_args__ = {"version_id_col": version}  # noqa: RUF012 (read by the mapper, never mutated)
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        platform: str,
+        account: str,
+        content: dict[str, Any],
+        status: Status,
+        actor: Actor,
+        now: datetime,
+        since: datetime | None = None,
+        remote_id: str | None = None,
+    ) -> Post:
+        """A post created in `status`, its first event at `since` (`now` by default); raises
+        TransitionRefused when `actor` may not create a post in this status."""
+        if not allowed(actor, None, status):
+            raise TransitionRefused(f"the {actor} cannot create a {platform} post {status}")
+        return cls(
+            platform=platform,
+            account=account,
+            content=content,
+            status=status,
+            remote_id=remote_id,
+            failures=0,
+            extra={},
+            updated_at=now,
+            events=[Event(status=status, at=since or now)],
+        )
+
+    def move(
+        self, status: Status, actor: Actor, now: datetime, error: str | None = None, *, dated: bool = True
+    ) -> None:
+        """Changes the status, with an event unless `dated` is false; raises TransitionRefused, having
+        changed nothing, when `actor` may not make the change."""
+        if not allowed(actor, self.status, status):
+            raise TransitionRefused(f"the {self.platform} post is {self.status}: the {actor} cannot make it {status}")
+        self.status = status
+        self.error = error
+        self.updated_at = now
+        if dated:
+            self.events.append(Event(status=status, error=error, at=now))
 
 
 class Event(Base):

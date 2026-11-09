@@ -6,11 +6,13 @@ from __future__ import annotations
 from importlib.metadata import version
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from postillon.api.routes import entries
 from postillon.db.session import check_schema, connect, sessions
+from postillon.errors import Conflict, Invalid, NotFound, Refused
 from postillon.settings import Settings
 from postillon.storage.videos import VideoStore
 
@@ -24,6 +26,7 @@ def create_app(settings: Settings) -> FastAPI:
     app.state.sessions = sessions(engine)
     app.state.videos = VideoStore(settings.videos_dir, settings.max_video_bytes)
     app.include_router(entries.router, prefix="/v1")
+    app.add_exception_handler(Refused, _refused)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:
@@ -32,3 +35,16 @@ def create_app(settings: Settings) -> FastAPI:
     # Mounted last: the routes above take precedence over its catch-all path.
     app.mount("/", StaticFiles(directory=Path(__file__).parent.parent / "web", html=True), name="web")
     return app
+
+
+STATUSES = {
+    NotFound: status.HTTP_404_NOT_FOUND,
+    Invalid: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    Conflict: status.HTTP_409_CONFLICT,
+}
+
+
+async def _refused(request: Request, error: Exception) -> JSONResponse:
+    """The response to a refusal of the service, its status set by the refusal's kind."""
+    code = next(code for kind, code in STATUSES.items() if isinstance(error, kind))
+    return JSONResponse({"detail": str(error)}, status_code=code)

@@ -8,12 +8,13 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from postillon.db.models import Post
 from postillon.domain import PostState, Status
+from postillon.errors import PlatformNotManual, PostChanged, PostNotFound, PublishAtPassed, TransitionRefused
 from postillon.manifest import Manifest
 from postillon.platforms.base import Task
 from postillon.platforms.tiktok.client import TikTokPlatform
 from postillon.services import entries
 from postillon.services.publishing import Publisher
-from postillon.services.scheduling import NotManual, PostNotFound, SchedulingConflict, mark_scheduled
+from postillon.services.scheduling import mark_scheduled
 from postillon.services.submission import submit
 from postillon.settings import Settings
 from postillon.storage.videos import VideoStore
@@ -58,7 +59,7 @@ def test_pending_post_is_scheduled_with_its_event(session_factory):
     [
         ("tiktok", "unknown", PostNotFound, "entry my-project/unknown has no tiktok post"),
         ("instagram", KEY, PostNotFound, "has no instagram post"),
-        ("youtube", KEY, NotManual, "youtube is published by the service"),
+        ("youtube", KEY, PlatformNotManual, "youtube is published by the service"),
     ],
 )
 def test_refused_post(session_factory, platform: str, key: str, error: type[Exception], message: str):
@@ -68,12 +69,12 @@ def test_refused_post(session_factory, platform: str, key: str, error: type[Exce
 
 def test_post_no_longer_pending_is_a_conflict(session_factory):
     schedule(session_factory)
-    with pytest.raises(SchedulingConflict, match="is scheduled, not pending"):
+    with pytest.raises(TransitionRefused, match="is scheduled"):
         schedule(session_factory)
 
 
 def test_post_past_its_publication_time_is_a_conflict(session_factory):
-    with pytest.raises(SchedulingConflict, match="has passed"):
+    with pytest.raises(PublishAtPassed, match="has passed"):
         schedule(session_factory, now=PUBLISH_AT)
     assert stored(session_factory)["tiktok"].status == Status.PENDING
 
@@ -83,7 +84,7 @@ def test_post_changed_meanwhile_is_a_conflict(session_factory, monkeypatch: pyte
         raise StaleDataError("changed")
 
     monkeypatch.setattr(Session, "commit", stale)
-    with pytest.raises(SchedulingConflict, match="changed meanwhile"):
+    with pytest.raises(PostChanged, match="changed meanwhile"):
         schedule(session_factory)
 
 

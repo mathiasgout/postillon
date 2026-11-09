@@ -14,24 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.orm.exc import StaleDataError
 
-from postillon.db.models import Entry, Event, Post
-from postillon.domain import HOLDS_VIDEO, SENT, Status
+from postillon.db.models import Entry, Post
+from postillon.domain import HOLDS_VIDEO, SENT, Actor, Status
+from postillon.errors import AccountNotConfigured, PostChanged, ProjectNotFound, VideoMissing
 from postillon.manifest import Manifest
 from postillon.platforms.base import PlatformPost
 from postillon.settings import Settings
-from postillon.storage.videos import InvalidVideo, VideoStore
-
-
-class UnknownProject(LookupError):
-    pass
-
-
-class SubmissionRefused(ValueError):
-    pass
-
-
-class SubmissionConflict(Exception):
-    """The worker changed a post of the entry meanwhile; submitting again settles it."""
+from postillon.storage.videos import VideoStore
 
 
 @dataclasses.dataclass(frozen=True)
@@ -53,19 +42,16 @@ def submit(
     video: BinaryIO | None,
     now: datetime,
 ) -> Submitted:
-    """Creates or replaces the entry; raises UnknownProject, SubmissionRefused or
-    SubmissionConflict, having written nothing."""
+    """Creates or replaces the entry; raises ProjectNotFound, AccountNotConfigured, VideoMissing,
+    VideoTooLarge, VideoNotMp4 or PostChanged, having written nothing."""
     posts = check_accounts(settings, project, manifest)
     entry = session.scalar(
         select(Entry).where(Entry.project == project, Entry.key == key).options(selectinload(Entry.posts)),
     )
     current = {post.platform: post for post in entry.posts} if entry else {}
     if video is None and not videos.exists(project, key) and any(_needs_video(current.get(name)) for name in posts):
-        raise SubmissionRefused("video is missing")
-    try:
-        staged = videos.stage(video) if video is not None else None
-    except InvalidVideo as e:
-        raise SubmissionRefused(str(e)) from None
+        raise VideoMissing("video is missing")
+    staged = videos.stage(video) if video is not None else None
     created = entry is None
     try:
         if entry is None:
@@ -84,7 +70,7 @@ def submit(
         if staged is not None:
             videos.discard(staged)
         if isinstance(e, StaleDataError):
-            raise SubmissionConflict("a post of the entry changed meanwhile, submit again") from None
+            raise PostChanged("a post of the entry changed meanwhile, submit again") from None
         raise
     if staged is not None:
         videos.promote(staged, project, key)
@@ -92,14 +78,15 @@ def submit(
 
 
 def check_accounts(settings: Settings, project: str, manifest: Manifest) -> dict[str, PlatformPost]:
-    """The manifest's posts, each with an account configured in the project."""
+    """The manifest's posts, each with an account configured in the project; raises ProjectNotFound
+    or AccountNotConfigured."""
     configured = settings.projects.get(project)
     if configured is None:
-        raise UnknownProject(f"project {project!r} is not configured")
+        raise ProjectNotFound(f"project {project!r} is not configured")
     posts = manifest.posts.by_platform()
     for name, post in posts.items():
         if post.account not in configured.accounts(name):
-            raise SubmissionRefused(f"account {post.account!r} is not configured for {name} in {project}")
+            raise AccountNotConfigured(f"account {post.account!r} is not configured for {name} in {project}")
     return posts
 
 
@@ -122,15 +109,13 @@ def _apply_posts(
         existing = current.pop(name, None)
         if existing is None:
             entry.posts.append(
-                Post(
+                Post.new(
                     platform=name,
                     account=post.account,
                     content=content,
                     status=Status.PENDING,
-                    failures=0,
-                    extra={},
-                    updated_at=now,
-                    events=[Event(status=Status.PENDING, at=now)],
+                    actor=Actor.PRODUCER,
+                    now=now,
                 )
             )
         elif existing.status in SENT:
@@ -153,6 +138,4 @@ def _replace(post: Post, account: str, content: dict[str, Any], now: datetime) -
     post.failures = 0
     post.updated_at = now
     if post.status == Status.REJECTED:
-        post.status = Status.PENDING
-        post.error = None
-        post.events.append(Event(status=Status.PENDING, at=now))
+        post.move(Status.PENDING, Actor.PRODUCER, now)

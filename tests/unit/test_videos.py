@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from postillon.storage.videos import InvalidVideo, StoredVideo, VideoStore
+from postillon.errors import Invalid
+from postillon.storage.videos import StoredVideo, VideoStore
 from tests.support import MP4, FakeBucket
 
 
@@ -27,7 +28,7 @@ def test_promotion_keeps_an_open_file_readable(videos: VideoStore):
     [(b"\x00\x00\x00\x18moovmp42" + b"\x00" * 64, "not an MP4"), (MP4 + b"\x00" * 10_000, "over 10000 bytes")],
 )
 def test_invalid_video_leaves_no_file(videos: VideoStore, settings_videos_dir: Path, content: bytes, message: str):
-    with pytest.raises(InvalidVideo, match=message):
+    with pytest.raises(Invalid, match=message):
         videos.stage(io.BytesIO(content))
     assert list(settings_videos_dir.rglob("*.mp4")) == []
 

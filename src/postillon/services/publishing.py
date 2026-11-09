@@ -16,8 +16,8 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
 
-from postillon.db.models import Entry, Event, Post
-from postillon.domain import HOLDS_VIDEO, PostState, Status
+from postillon.db.models import Entry, Post
+from postillon.domain import ACTIVE, HOLDS_VIDEO, Actor, PostState, Status
 from postillon.platforms import PLATFORMS
 from postillon.platforms.base import Platform, Task
 from postillon.settings import Settings
@@ -26,8 +26,6 @@ from postillon.storage.videos import StoredVideo, VideoStore
 
 log = logging.getLogger(__name__)
 
-# The statuses whose post the worker still steps.
-ACTIVE = (Status.PENDING, Status.IN_PROGRESS, Status.FAILED, Status.SCHEDULED)
 # Every new YouTube upload counts against a daily quota shared by the channels of a Google Cloud
 # project: a lasting failure retried each minute would exhaust it within hours.
 RETRY_FIRST = timedelta(minutes=1)
@@ -53,7 +51,7 @@ class Publisher:
     def run_pass(self, now: datetime) -> None:
         with self.sessions() as session:
             posts = session.scalars(
-                select(Post).where(Post.status.in_(ACTIVE)).options(joinedload(Post.entry)),
+                select(Post).where(Post.status.in_(sorted(ACTIVE))).options(joinedload(Post.entry)),
             ).all()
             due = [post.id for post in posts if _is_due(post, now)]
         for post_id in due:
@@ -143,19 +141,20 @@ def _record(post: Post, new: PostState, now: datetime) -> None:
     values = (new.status, new.remote_id, error, new.extra, failures)
     if values == (post.status, post.remote_id, post.error, post.extra, post.failures):
         return
-    if new.status != post.status and not retrying:
-        entry = post.entry
-        log.info(
-            "%s/%s %s: %s -> %s%s",
-            entry.project,
-            entry.key,
-            post.platform,
-            post.status,
-            new.status,
-            f" ({error})" if error else "",
-        )
-        post.events.append(Event(status=new.status, error=error, at=now))
-    post.status, post.remote_id, post.error, post.extra, post.failures = values
+    if new.status != post.status:
+        if not retrying:
+            entry = post.entry
+            log.info(
+                "%s/%s %s: %s -> %s%s",
+                entry.project,
+                entry.key,
+                post.platform,
+                post.status,
+                new.status,
+                f" ({error})" if error else "",
+            )
+        post.move(new.status, Actor.WORKER, now, error, dated=not retrying)
+    post.remote_id, post.error, post.extra, post.failures = new.remote_id, error, new.extra, failures
     post.updated_at = now
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, Path, Query, Response, UploadFile, status
+from fastapi import APIRouter, File, Form, Path, Query, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
@@ -14,11 +14,12 @@ from pydantic import ValidationError
 from postillon.api.deps import SessionDep, SettingsDep, VideosDep
 from postillon.api.schemas import EntryOut, RecordIn, SubmissionOut
 from postillon.domain import Status
+from postillon.errors import EntryNotFound, VideoNotFound
 from postillon.manifest import Manifest
 from postillon.services import entries, recording
-from postillon.services.recording import Publication, RecordConflict, RecordRefused
-from postillon.services.scheduling import NotManual, PostNotFound, SchedulingConflict, mark_scheduled
-from postillon.services.submission import SubmissionConflict, SubmissionRefused, UnknownProject, submit
+from postillon.services.recording import Publication
+from postillon.services.scheduling import mark_scheduled
+from postillon.services.submission import submit
 
 router = APIRouter(tags=["entries"])
 
@@ -54,23 +55,16 @@ def put_entry(
                 for error in e.errors(include_url=False, include_context=False)
             ],
         ) from None
-    try:
-        submitted = submit(
-            session,
-            settings,
-            videos,
-            project=project,
-            key=key,
-            manifest=manifest,
-            video=video.file if video else None,
-            now=datetime.now(UTC),
-        )
-    except UnknownProject as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
-    except SubmissionRefused as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
-    except SubmissionConflict as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    submitted = submit(
+        session,
+        settings,
+        videos,
+        project=project,
+        key=key,
+        manifest=manifest,
+        video=video.file if video else None,
+        now=datetime.now(UTC),
+    )
     if submitted.created:
         response.status_code = status.HTTP_201_CREATED
     entry_out = EntryOut.model_validate(entries.get(session, project, key))
@@ -87,7 +81,7 @@ def get_video(project: ProjectPath, key: KeyPath, videos: VideosDep) -> FileResp
     """The video of the entry, while the service holds it."""
     path = videos.path(project, key)
     if not path.exists():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"the service holds no video of {project}/{key}")
+        raise VideoNotFound(f"the service holds no video of {project}/{key}")
     return FileResponse(
         path,
         media_type="video/mp4",
@@ -101,7 +95,7 @@ def get_entry(project: ProjectPath, key: KeyPath, session: SessionDep) -> EntryO
     """The entry, the state of its posts and the history of their statuses."""
     found = entries.get(session, project, key)
     if found is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, f"entry {project}/{key} does not exist")
+        raise EntryNotFound(f"entry {project}/{key} does not exist")
     return EntryOut.model_validate(found)
 
 
@@ -128,22 +122,15 @@ def record_entry(
     """Records an entry published outside the service, each post `published` at its time. Never
     changes an existing entry."""
     published = {name: Publication(at=p.at, remote_id=p.remote_id) for name, p in body.published.items()}
-    try:
-        recording.record(
-            session,
-            settings,
-            project=project,
-            key=key,
-            manifest=body.manifest,
-            published=published,
-            now=datetime.now(UTC),
-        )
-    except UnknownProject as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
-    except RecordRefused as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
-    except RecordConflict as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    recording.record(
+        session,
+        settings,
+        project=project,
+        key=key,
+        manifest=body.manifest,
+        published=published,
+        now=datetime.now(UTC),
+    )
     return EntryOut.model_validate(entries.get(session, project, key))
 
 
@@ -151,12 +138,5 @@ def record_entry(
 def schedule_post(project: ProjectPath, key: KeyPath, platform: PlatformPath, session: SessionDep) -> EntryOut:
     """Records that the operator scheduled the post on its platform, which publishes it at `publish_at`.
     Only for a pending post of a manual platform, before its publication time."""
-    try:
-        mark_scheduled(session, project=project, key=key, platform=platform, now=datetime.now(UTC))
-    except PostNotFound as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
-    except NotManual as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
-    except SchedulingConflict as e:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    mark_scheduled(session, project=project, key=key, platform=platform, now=datetime.now(UTC))
     return EntryOut.model_validate(entries.get(session, project, key))

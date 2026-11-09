@@ -7,15 +7,10 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from postillon.db.models import Post
 from postillon.domain import Status
+from postillon.errors import AccountNotConfigured, PostChanged, ProjectNotFound, VideoMissing, VideoNotMp4
 from postillon.manifest import Manifest
 from postillon.services import entries
-from postillon.services.submission import (
-    SubmissionConflict,
-    SubmissionRefused,
-    Submitted,
-    UnknownProject,
-    submit,
-)
+from postillon.services.submission import Submitted, submit
 from postillon.settings import Settings
 from postillon.storage.videos import VideoStore
 from tests.support import BEFORE, MP4, PUBLISH_AT
@@ -75,24 +70,24 @@ def test_new_entry_creates_its_posts_and_keeps_its_video(send, session_factory, 
 
 
 def test_unknown_project_is_refused(send):
-    with pytest.raises(UnknownProject):
+    with pytest.raises(ProjectNotFound):
         send(project="other")
 
 
 def test_unconfigured_account_is_refused(send):
-    with pytest.raises(SubmissionRefused, match="account 'other' is not configured for youtube"):
+    with pytest.raises(AccountNotConfigured, match="account 'other' is not configured for youtube"):
         send(manifest(youtube={"account": "other", "title": "Day 23"}))
 
 
 def test_new_entry_without_video_is_refused(send, session_factory):
-    with pytest.raises(SubmissionRefused, match="video is missing"):
+    with pytest.raises(VideoMissing, match="video is missing"):
         send(video=None)
     with session_factory() as session:
         assert entries.get(session, "my-project", KEY) is None
 
 
 def test_invalid_video_writes_nothing(send, session_factory, videos: VideoStore):
-    with pytest.raises(SubmissionRefused, match="not an MP4"):
+    with pytest.raises(VideoNotMp4, match="not an MP4"):
         send(video=b"not a video")
     with session_factory() as session:
         assert entries.get(session, "my-project", KEY) is None
@@ -143,7 +138,7 @@ def test_platform_removed_from_a_sent_entry_is_listed(send, session_factory):
 def test_video_is_required_again_once_released(send, videos: VideoStore, session_factory):
     send()
     videos.delete("my-project", KEY)
-    with pytest.raises(SubmissionRefused, match="video is missing"):
+    with pytest.raises(VideoMissing, match="video is missing"):
         send(video=None)
     for platform in ("youtube", "instagram"):
         set_status(session_factory, platform, Status.PUBLISHED)
@@ -157,7 +152,7 @@ def test_conflicting_write_discards_the_new_video(send, videos: VideoStore, monk
         raise StaleDataError("changed")
 
     monkeypatch.setattr(Session, "commit", stale)
-    with pytest.raises(SubmissionConflict):
+    with pytest.raises(PostChanged):
         send(video=MP4 + b"new")
     assert videos.path("my-project", KEY).read_bytes() == MP4
     assert list((videos.root / ".staging").iterdir()) == []

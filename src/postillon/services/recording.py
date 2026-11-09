@@ -12,19 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from postillon.db.models import Entry, Event, Post
-from postillon.domain import Status
+from postillon.db.models import Entry, Post
+from postillon.domain import Actor, Status
+from postillon.errors import EntryExists, PublicationInFuture, PublicationsMismatch
 from postillon.manifest import Manifest
-from postillon.services.submission import SubmissionRefused, check_accounts
+from postillon.services.submission import check_accounts
 from postillon.settings import Settings
-
-
-class RecordRefused(ValueError):
-    pass
-
-
-class RecordConflict(Exception):
-    """The entry exists already: a record never changes an entry."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,19 +36,17 @@ def record(
     published: dict[str, Publication],
     now: datetime,
 ) -> Entry:
-    """Creates the entry with its posts `published`; raises UnknownProject, RecordRefused or
-    RecordConflict, having written nothing."""
-    try:
-        posts = check_accounts(settings, project, manifest)
-    except SubmissionRefused as e:
-        raise RecordRefused(str(e)) from None
+    """Creates the entry with its posts `published`; raises ProjectNotFound, AccountNotConfigured,
+    PublicationsMismatch, PublicationInFuture or EntryExists, having written nothing. A record never
+    changes an existing entry."""
+    posts = check_accounts(settings, project, manifest)
     if set(published) != set(posts):
-        raise RecordRefused(f"published must name the platforms of the posts: {', '.join(sorted(posts))}")
+        raise PublicationsMismatch(f"published must name the platforms of the posts: {', '.join(sorted(posts))}")
     future = sorted(name for name, publication in published.items() if publication.at > now)
     if future:
-        raise RecordRefused(f"a publication time is in the future: {', '.join(future)}")
+        raise PublicationInFuture(f"a publication time is in the future: {', '.join(future)}")
     if session.scalar(select(Entry.id).where(Entry.project == project, Entry.key == key)) is not None:
-        raise RecordConflict(f"entry {project}/{key} exists already")
+        raise EntryExists(f"entry {project}/{key} exists already")
     entry = Entry(
         project=project,
         key=key,
@@ -65,16 +56,15 @@ def record(
         updated_at=now,
         video_released_at=now,
         posts=[
-            Post(
+            Post.new(
                 platform=name,
                 account=post.account,
                 content=post.model_dump(mode="json"),
                 status=Status.PUBLISHED,
+                actor=Actor.PRODUCER,
+                now=now,
+                since=published[name].at,
                 remote_id=published[name].remote_id,
-                failures=0,
-                extra={},
-                updated_at=now,
-                events=[Event(status=Status.PUBLISHED, at=published[name].at)],
             )
             for name, post in posts.items()
         ],
@@ -84,5 +74,5 @@ def record(
         session.commit()
     except IntegrityError:
         session.rollback()
-        raise RecordConflict(f"entry {project}/{key} exists already") from None
+        raise EntryExists(f"entry {project}/{key} exists already") from None
     return entry

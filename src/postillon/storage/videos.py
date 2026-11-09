@@ -12,15 +12,12 @@ import uuid
 from pathlib import Path
 from typing import BinaryIO
 
+from postillon.errors import VideoNotMp4, VideoTooLarge
 from postillon.storage.bucket import Bucket
 
 CHUNK_BYTES = 1024 * 1024
 # An MP4 file opens with a box whose type, at bytes 4 to 8, is `ftyp`.
 MP4_SIGNATURE = b"ftyp"
-
-
-class InvalidVideo(ValueError):
-    pass
 
 
 class VideoStore:
@@ -36,7 +33,7 @@ class VideoStore:
         return self.path(project, key).exists()
 
     def stage(self, source: BinaryIO) -> Path:
-        """Copies the video to a staging file; raises InvalidVideo when it is too large or not an MP4."""
+        """Copies the video to a staging file; raises VideoTooLarge or VideoNotMp4."""
         self._staging.mkdir(parents=True, exist_ok=True)
         staged = self._staging / f"{uuid.uuid4().hex}.mp4"
         size = 0
@@ -45,11 +42,11 @@ class VideoStore:
                 while chunk := source.read(CHUNK_BYTES):
                     size += len(chunk)
                     if size > self.max_bytes:
-                        raise InvalidVideo(f"video is over {self.max_bytes} bytes")
+                        raise VideoTooLarge(f"video is over {self.max_bytes} bytes")
                     out.write(chunk)
             with staged.open("rb") as f:
                 if f.read(8)[4:8] != MP4_SIGNATURE:
-                    raise InvalidVideo("video is not an MP4 file")
+                    raise VideoNotMp4("video is not an MP4 file")
         except BaseException:
             staged.unlink(missing_ok=True)
             raise

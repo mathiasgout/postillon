@@ -17,6 +17,16 @@ that succeeds or rejects it, and the post itself carries the count and the lates
 `in_progress`, `scheduled` and `published` posts may have reached their platform: a new
 submission leaves them as they are.
 
+## Who changes a status
+
+| Actor | Change |
+| --- | --- |
+| Producer | Creates a post `pending` by a submission, or `published` by a record; makes a `rejected` post `pending` by submitting the entry again. |
+| Operator | Makes a `pending` post of a manual platform `scheduled`, before `publish_at`. |
+| Worker | Gives a `pending`, `in_progress`, `failed` or `scheduled` post the status its platform returns. |
+
+The service refuses any other change (see `api.md`).
+
 ## When the worker steps a post
 
 The worker runs a pass every `poll_seconds` (see `configuration.md`) and hands every post
